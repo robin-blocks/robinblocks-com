@@ -3,20 +3,18 @@ import { useEmailSubscription } from '../hooks/useEmailSubscription';
 
 export default function EmailSignup() {
   const [email, setEmail] = useState('');
-  const [firstName, setFirstName] = useState('');
   const { subscribe, loading, success, error, reset } = useEmailSubscription();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (email) {
-      await subscribe(email, firstName);
+      await subscribe(email);
     }
   };
 
   const handleTryAgain = () => {
     reset();
     setEmail('');
-    setFirstName('');
   };
 
   if (success) {
@@ -46,20 +44,6 @@ export default function EmailSignup() {
   return (
     <div className="max-w-md mx-auto">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-            First Name <span className="text-gray-400">(Optional)</span>
-          </label>
-          <input
-            id="firstName"
-            type="text"
-            placeholder="Enter your first name"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            className="form-input"
-          />
-        </div>
-        
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
             Email Address <span className="text-red-500">*</span>

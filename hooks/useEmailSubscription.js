@@ -5,7 +5,7 @@ export const useEmailSubscription = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  const subscribe = async (email, firstName = '', lastName = '') => {
+  const subscribe = async (email) => {
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -16,7 +16,7 @@ export const useEmailSubscription = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, firstName, lastName }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();

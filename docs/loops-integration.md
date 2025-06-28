@@ -224,7 +224,7 @@ export const useEmailSubscription = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  const subscribe = async (email, firstName = '', lastName = '') => {
+  const subscribe = async (email) => {
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -235,7 +235,7 @@ export const useEmailSubscription = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, firstName, lastName }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
@@ -265,13 +265,12 @@ import { useEmailSubscription } from '../hooks/useEmailSubscription';
 
 export default function EmailSignup() {
   const [email, setEmail] = useState('');
-  const [firstName, setFirstName] = useState('');
   const { subscribe, loading, success, error } = useEmailSubscription();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (email) {
-      await subscribe(email, firstName);
+      await subscribe(email);
     }
   };
 
@@ -286,15 +285,6 @@ export default function EmailSignup() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <input
-          type="text"
-          placeholder="First Name (Optional)"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          className="w-full p-3 border border-gray-300 rounded-lg"
-        />
-      </div>
       <div>
         <input
           type="email"
