@@ -30,7 +30,7 @@ export default function EmailSignup() {
           </div>
           <h3 className="text-2xl font-bold text-green-800 mb-2">Welcome aboard! 🎉</h3>
           <p className="text-green-700 mb-6">
-            Thank you for joining the Robin Blocks mailing list. You'll receive exciting updates and insights straight to your inbox.
+            Thank you for joining the Robin Blocks mailing list. You&apos;ll receive exciting updates and insights straight to your inbox.
           </p>
           <button
             onClick={handleTryAgain}
