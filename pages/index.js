@@ -70,6 +70,36 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Featured Content */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-12 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div className="text-left">
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  🎬 New Guide Available
+                </h3>
+                <p className="text-white/90 mb-4">
+                  Master the art of prompting with Veo 3 and achieve cinematic consistency in your video projects.
+                </p>
+                <a 
+                  href="/veo-3-guide" 
+                  className="inline-flex items-center bg-gradient-to-r from-yellow-300 to-orange-300 text-gray-900 font-semibold px-6 py-3 rounded-lg hover:from-yellow-400 hover:to-orange-400 transition-all duration-200 shadow-lg"
+                >
+                  Read the Guide
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
+              <div className="hidden md:block ml-8">
+                <div className="w-20 h-20 bg-gradient-to-r from-yellow-300/20 to-orange-300/20 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Signup Form */}
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-2xl">
             <h2 className="text-3xl font-bold text-gray-800 mb-6">
