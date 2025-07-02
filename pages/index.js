@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import EmailSignup from '../components/EmailSignup';
 
 export default function Home() {
@@ -80,7 +81,7 @@ export default function Home() {
                 <p className="text-white/90 mb-4">
                   Master the art of prompting with Veo 3 and achieve cinematic consistency in your video projects.
                 </p>
-                <a 
+                <Link 
                   href="/veo-3-guide" 
                   className="inline-flex items-center bg-gradient-to-r from-yellow-300 to-orange-300 text-gray-900 font-semibold px-6 py-3 rounded-lg hover:from-yellow-400 hover:to-orange-400 transition-all duration-200 shadow-lg"
                 >
@@ -88,7 +89,7 @@ export default function Home() {
                   <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                </a>
+                </Link>
               </div>
               <div className="hidden md:block ml-8">
                 <div className="w-20 h-20 bg-gradient-to-r from-yellow-300/20 to-orange-300/20 rounded-full flex items-center justify-center">

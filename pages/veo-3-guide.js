@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 
 export default function Veo3Guide() {
   return (
@@ -52,7 +53,7 @@ export default function Veo3Guide() {
                 </h2>
                 
                 <p className="text-gray-700 mb-6">
-                  Before writing a single video prompt, you must establish your project's "source of truth." 
+                  Before writing a single video prompt, you must establish your project&apos;s &ldquo;source of truth.&rdquo; 
                   This involves creating detailed, text-based reference sheets for every consistent element in your story.
                 </p>
 
@@ -70,7 +71,7 @@ export default function Veo3Guide() {
                     <div>
                       <h4 className="font-bold text-gray-800 mb-2">• Visuals:</h4>
                       <p className="text-gray-700 mb-3">
-                        Be hyper-specific. Go beyond "a man in a jacket" to include age, specific facial features, 
+                        Be hyper-specific. Go beyond &ldquo;a man in a jacket&rdquo; to include age, specific facial features, 
                         hair style and color, skin details, posture, and exact clothing, including textures and accessories.
                       </p>
                       <div className="bg-gray-100 rounded-lg p-4 border-l-4 border-blue-400">
@@ -85,7 +86,7 @@ export default function Veo3Guide() {
                     <div>
                       <h4 className="font-bold text-gray-800 mb-2">• Vocal Profile:</h4>
                       <p className="text-gray-700 mb-3">
-                        Describe the character's voice clearly to guide the audio generation for any dialogue.
+                        Describe the character&apos;s voice clearly to guide the audio generation for any dialogue.
                       </p>
                       <div className="bg-gray-100 rounded-lg p-4 border-l-4 border-blue-400">
                         <p className="text-sm text-gray-700 italic">
@@ -110,7 +111,7 @@ export default function Veo3Guide() {
                   <div>
                     <h4 className="font-bold text-gray-800 mb-2">• Be Evocative:</h4>
                     <p className="text-gray-700 mb-3">
-                      Don't just name the place. Describe the mood, the materials, the lighting, 
+                      Don&apos;t just name the place. Describe the mood, the materials, the lighting, 
                       and even the smell or feeling of the air.
                     </p>
                     
@@ -141,7 +142,7 @@ export default function Veo3Guide() {
               {/* Part 2 */}
               <section className="mb-12">
                 <h2 className="text-3xl font-bold text-gray-800 mb-6 border-b-2 border-blue-200 pb-3">
-                  Part 2: The Core Technique – The "Self-Contained Universe" Prompt
+                  Part 2: The Core Technique – The &ldquo;Self-Contained Universe&rdquo; Prompt
                 </h2>
                 
                 <p className="text-gray-700 mb-6">
@@ -174,7 +175,7 @@ export default function Veo3Guide() {
                       <ul className="space-y-2 text-gray-700">
                         <li>• This is the most critical field for visual consistency. Fully describe the environment.</li>
                         <li>• <strong>Paste the entire Location Master Sheet</strong> for the primary location.</li>
-                        <li>• <strong>The "Interior + Exterior" Rule:</strong> If the shot is an interior with a window or viewport, you must describe <strong>both</strong> the interior and the visible exterior. Paste the full master sheets for both.</li>
+                        <li>• <strong>The &ldquo;Interior + Exterior&rdquo; Rule:</strong> If the shot is an interior with a window or viewport, you must describe <strong>both</strong> the interior and the visible exterior. Paste the full master sheets for both.</li>
                       </ul>
                       <div className="bg-white rounded-lg p-4 mt-3 border border-yellow-200">
                         <p className="text-sm text-gray-700 italic">
@@ -193,8 +194,8 @@ export default function Veo3Guide() {
                       </ul>
                       <div className="bg-white rounded-lg p-4 mt-3 border border-yellow-200">
                         <p className="text-sm text-gray-700 italic">
-                          <strong>Example:</strong> Instead of "A skilled weaver works," use "Her nimble hands move with practiced grace, 
-                          passing a shuttle back and forth, weaving a cloth threaded with glowing fibers."
+                          <strong>Example:</strong> Instead of &ldquo;A skilled weaver works,&rdquo; use &ldquo;Her nimble hands move with practiced grace, 
+                                                      passing a shuttle back and forth, weaving a cloth threaded with glowing fibers.&rdquo;
                         </p>
                       </div>
                     </div>
@@ -209,7 +210,7 @@ export default function Veo3Guide() {
                       <div className="bg-white rounded-lg p-4 mt-3 border border-yellow-200">
                         <p className="text-sm text-gray-700 italic">
                           <strong>Example:</strong> Cinematic extreme close-up shot, framed so tightly that only her eyes are visible. 
-                          The focus is razor-sharp on her irises. The lighting is a mix of the cool blue light from the ship's consoles 
+                          The focus is razor-sharp on her irises. The lighting is a mix of the cool blue light from the ship&apos;s consoles 
                           and the soft, grey light of dawn.
                         </p>
                       </div>
@@ -219,7 +220,7 @@ export default function Veo3Guide() {
                     <div className="border-l-4 border-yellow-400 pl-6">
                       <h4 className="text-xl font-bold text-gray-800 mb-3">Camera Motion:</h4>
                       <ul className="space-y-2 text-gray-700">
-                        <li>• Explicitly state the camera movement, even if it's static. This removes ambiguity.</li>
+                        <li>• Explicitly state the camera movement, even if it&apos;s static. This removes ambiguity.</li>
                       </ul>
                       <div className="bg-white rounded-lg p-4 mt-3 border border-yellow-200">
                         <p className="text-sm text-gray-700 italic">
@@ -235,7 +236,7 @@ export default function Veo3Guide() {
                       <h4 className="text-xl font-bold text-gray-800 mb-3">Ambiance/Audio:</h4>
                       <ul className="space-y-2 text-gray-700">
                         <li>• <strong>Diegetic Sound Only:</strong> This is crucial. Describe only the sounds that exist within the world of the scene. Do not mention music or narration, as those are post-production layers for different models.</li>
-                        <li>• Be specific. Instead of "noise," use "the rhythmic clang of a hammer," "the low hum of life support," or "the sharp click of a plastic cover being lifted."</li>
+                        <li>• Be specific. Instead of &ldquo;noise,&rdquo; use &ldquo;the rhythmic clang of a hammer,&rdquo; &ldquo;the low hum of life support,&rdquo; or &ldquo;the sharp click of a plastic cover being lifted.&rdquo;</li>
                       </ul>
                     </div>
 
@@ -249,7 +250,7 @@ export default function Veo3Guide() {
                       <div className="bg-white rounded-lg p-4 mt-3 border border-yellow-200">
                         <p className="text-sm text-gray-700 italic">
                           <strong>Example:</strong> The woman with the blonde bun, her voice a crisp, commanding alto with a clipped, 
-                          Pan-Slavic accent, says: "Miracles aren't in my mission parameters."
+                          Pan-Slavic accent, says: &ldquo;Miracles aren&apos;t in my mission parameters.&rdquo;
                         </p>
                       </div>
                     </div>
@@ -261,14 +262,14 @@ export default function Veo3Guide() {
               <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-8 text-center text-white">
                 <h3 className="text-2xl font-bold mb-4">Ready to Master Veo 3 Prompting?</h3>
                 <p className="text-lg mb-6 text-white/90">
-                  Start implementing these techniques in your next video project and achieve the cinematic consistency you've been looking for.
+                  Start implementing these techniques in your next video project and achieve the cinematic consistency you&apos;ve been looking for.
                 </p>
-                <a 
+                <Link 
                   href="/"
                   className="inline-block bg-white text-primary-600 font-semibold py-3 px-8 rounded-lg hover:bg-gray-100 transition-colors duration-200"
                 >
                   Back to Robin Blocks
-                </a>
+                </Link>
               </div>
             </div>
           </div>
