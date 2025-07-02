@@ -104,10 +104,9 @@ robin-blocks-signup/
 - Change the source name in `pages/api/subscribe.js` (currently "Robin Blocks Website")
 
 #### Form Fields
-To add more fields (like lastName), update:
+The signup form collects only the essential email address for subscription. The backend API still supports optional fields like `firstName` and `lastName` if you want to re-add them later by updating:
 1. `components/EmailSignup.jsx` - Add form inputs
 2. `hooks/useEmailSubscription.js` - Include in the API call
-3. `pages/api/subscribe.js` - Handle the new fields
 
 ## API Reference
 
@@ -118,10 +117,11 @@ Subscribes an email to the Robin Blocks mailing list.
 **Request Body:**
 ```json
 {
-  "email": "user@example.com",
-  "firstName": "John" // optional
+  "email": "user@example.com"
 }
 ```
+
+Note: The API also accepts optional `firstName` and `lastName` fields, but the frontend form only collects the email address.
 
 **Success Response (200):**
 ```json
