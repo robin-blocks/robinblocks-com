@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import EmailSignup from '../components/EmailSignup';
 
 export default function Veo3Guide() {
   return (
@@ -403,6 +404,21 @@ export default function Veo3Guide() {
                       <span><strong>Self-Contained:</strong> This prompt could generate a consistent clip without any other context</span>
                     </li>
                   </ul>
+                </div>
+              </section>
+
+              {/* Email Signup Section */}
+              <section className="mb-12">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-200">
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                      Want More AI Video Creation Tips?
+                    </h3>
+                    <p className="text-gray-700 text-lg">
+                      Join the Robin Blocks mailing list for exclusive guides, techniques, and insights on AI video generation and creative technology.
+                    </p>
+                  </div>
+                  <EmailSignup />
                 </div>
               </section>
 
