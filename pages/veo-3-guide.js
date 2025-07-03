@@ -258,6 +258,154 @@ export default function Veo3Guide() {
                 </div>
               </section>
 
+              {/* Full Example Section */}
+              <section className="mb-12">
+                <h2 className="text-3xl font-bold text-gray-800 mb-6 border-b-2 border-green-200 pb-3">
+                  Complete Example: Putting It All Together
+                </h2>
+                
+                <p className="text-gray-700 mb-6">
+                  Here&apos;s a full example demonstrating how to apply the master sheet workflow and self-contained universe approach to create a single 8-second video prompt.
+                </p>
+
+                <div className="bg-green-50 rounded-xl p-6 mb-8">
+                  <h3 className="text-2xl font-bold text-gray-800 mb-6">Master Sheets (Created First)</h3>
+                  
+                  <div className="space-y-6">
+                    {/* Character Master Sheet */}
+                    <div className="bg-white rounded-lg p-6 border border-green-200">
+                      <h4 className="text-lg font-bold text-gray-800 mb-3 text-green-700">Character Master Sheet</h4>
+                      <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-400">
+                        <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                          <strong>Dr. Kaelen Reyes:</strong> A woman in her late 30s with dark, curious eyes and black hair tied back practically in a simple ponytail. She has a thoughtful, academic face with defined cheekbones and a small scar above her left eyebrow from a childhood accident. She wears a lightweight, dark grey Earth Federation field jumpsuit with a visible mission patch on the shoulder, practical cargo pockets, and reinforced knees. Her posture is confident but contemplative. Her vocal profile is a calm, thoughtful, mid-range voice with a standard American accent; she speaks with clarity and deliberation.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Location Master Sheet */}
+                    <div className="bg-white rounded-lg p-6 border border-green-200">
+                      <h4 className="text-lg font-bold text-gray-800 mb-3 text-green-700">Location Master Sheet</h4>
+                      <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-400">
+                        <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                          <strong>Earth Federation Lander Cockpit:</strong> The interior is a sterile and silent bridge, where the air smells of filtered oxygen and clean metal. The design is minimalist and functional, with two pilot seats made of dark memory-gel polymer that conform to the occupant&apos;s body. The control surfaces are smooth, touch-sensitive glass panels that glow with soft blue holographic displays showing navigation data, system diagnostics, and communication channels. All light originates from these glowing blue displays, casting cool shadows across the occupants&apos; faces. The walls are brushed titanium with subtle panel lines. Through the large, reinforced forward viewport, space is visible as an infinite black void dotted with distant stars.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 rounded-xl p-6 mb-8">
+                  <h3 className="text-2xl font-bold text-gray-800 mb-6">The Complete Prompt</h3>
+                  
+                  <div className="bg-white rounded-lg p-6 border border-blue-200">
+                    <div className="space-y-6">
+                      {/* Subject */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-blue-700 mb-2">Subject:</h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                            Dr. Kaelen Reyes, a woman in her late 30s with dark, curious eyes and black hair tied back practically in a simple ponytail. She has a thoughtful, academic face with defined cheekbones and a small scar above her left eyebrow from a childhood accident. She wears a lightweight, dark grey Earth Federation field jumpsuit with a visible mission patch on the shoulder, practical cargo pockets, and reinforced knees. Her posture is confident but contemplative. Her vocal profile is a calm, thoughtful, mid-range voice with a standard American accent; she speaks with clarity and deliberation.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Context */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-blue-700 mb-2">Context:</h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                            The scene is set within the Earth Federation Lander Cockpit. The interior is a sterile and silent bridge, where the air smells of filtered oxygen and clean metal. The design is minimalist and functional, with two pilot seats made of dark memory-gel polymer that conform to the occupant&apos;s body. The control surfaces are smooth, touch-sensitive glass panels that glow with soft blue holographic displays showing navigation data, system diagnostics, and communication channels. All light originates from these glowing blue displays, casting cool shadows across the occupants&apos; faces. The walls are brushed titanium with subtle panel lines. Through the large, reinforced forward viewport, space is visible as an infinite black void dotted with distant stars.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-blue-700 mb-2">Action:</h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                            Dr. Reyes sits in the pilot&apos;s seat, her fingers dancing across the holographic interface with practiced precision. She reaches forward and taps a sequence of glowing icons, her brow furrowed in concentration. A new display materializes before her, showing a three-dimensional star map. She leans back slightly, studying the data, then reaches up to adjust a control above her head with deliberate, careful movements.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Style/Composition */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-blue-700 mb-2">Style/Composition:</h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                            Cinematic medium shot, framed from her waist up, showing both her hands and face clearly. The shot is static with high-contrast lighting between the blue glow of the displays and the dark shadows. Shallow depth of field keeps Dr. Reyes in sharp focus while the background controls are slightly soft. The mood is serious and contemplative, with clean, minimalist sci-fi aesthetics.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Camera Motion */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-blue-700 mb-2">Camera Motion:</h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                            Static shot. The camera remains perfectly still to emphasize the precision and focus of her work.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Ambiance/Audio */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-blue-700 mb-2">Ambiance/Audio:</h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                            The low, constant hum of life support systems. Soft electronic beeps as she touches the interface controls. The subtle whoosh of the air recycling system. No music or narration.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Dialogue */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-blue-700 mb-2">Dialogue:</h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                          <p className="text-sm text-gray-700 font-mono leading-relaxed">
+                            The woman in the pilot&apos;s seat, her voice a calm, thoughtful, mid-range voice with a standard American accent, speaks with clarity and deliberation: &ldquo;Navigation systems show three possible routes. Calculating fuel efficiency now.&rdquo;
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 rounded-xl p-6">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <span className="text-2xl mr-3">💡</span>
+                    Key Takeaways from This Example
+                  </h3>
+                  <ul className="space-y-3 text-gray-700">
+                    <li className="flex items-start">
+                      <span className="text-yellow-600 font-bold mr-3">•</span>
+                      <span><strong>Complete Character Description:</strong> Every detail about Dr. Reyes is included, from physical appearance to vocal qualities</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-yellow-600 font-bold mr-3">•</span>
+                      <span><strong>Immersive Environment:</strong> The cockpit description includes sensory details (smell, materials, lighting)</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-yellow-600 font-bold mr-3">•</span>
+                      <span><strong>Specific Actions:</strong> Rather than &ldquo;she works,&rdquo; we see exactly what she does with her hands and body</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-yellow-600 font-bold mr-3">•</span>
+                      <span><strong>Clear Technical Specs:</strong> Shot type, lighting, and camera movement are explicitly defined</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-yellow-600 font-bold mr-3">•</span>
+                      <span><strong>Diegetic Audio Only:</strong> Sound effects exist within the story world, no external music</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-yellow-600 font-bold mr-3">•</span>
+                      <span><strong>Self-Contained:</strong> This prompt could generate a consistent clip without any other context</span>
+                    </li>
+                  </ul>
+                </div>
+              </section>
+
               {/* Call to Action */}
               <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-8 text-center text-white">
                 <h3 className="text-2xl font-bold mb-4">Ready to Master Veo 3 Prompting?</h3>
