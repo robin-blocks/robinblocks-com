@@ -47,6 +47,42 @@ export default function Veo3Guide() {
                 to maintain continuity with the clips before and after it.
               </p>
 
+              {/* Video Tutorial Section */}
+              <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-8 mb-12 border border-red-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-3 flex items-center">
+                      <span className="text-3xl mr-3">🎥</span>
+                      Watch the Full Tutorial
+                    </h3>
+                    <p className="text-gray-700 mb-4 text-lg">
+                      Prefer to learn by watching? Check out the complete video walkthrough of these Veo 3 prompting techniques on YouTube.
+                    </p>
+                    <a 
+                      href="https://www.youtube.com/watch?v=ANSUuPrxrFM" 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center bg-red-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-red-700 transition-all duration-200 shadow-lg"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136C4.495 20.455 12 20.455 12 20.455s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                      </svg>
+                      Watch on YouTube
+                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                  <div className="hidden md:block ml-8">
+                    <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center">
+                      <svg className="w-12 h-12 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136C4.495 20.455 12 20.455 12 20.455s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Part 1 */}
               <section className="mb-12">
                 <h2 className="text-3xl font-bold text-gray-800 mb-6 border-b-2 border-blue-200 pb-3">
