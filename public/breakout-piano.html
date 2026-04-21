@@ -92,42 +92,8 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .rotate-hint {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 18px;
-    padding: 24px;
-    text-align: center;
-    z-index: 20;
-  }
-  .rotate-hint svg {
-    color: var(--ink-2);
-    animation: rot 2.4s ease-in-out infinite;
-  }
-  .rotate-hint p {
-    margin: 0;
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-  .rotate-hint small {
-    color: var(--ink-3);
-    font-size: 13px;
-    font-weight: 500;
-  }
-  @keyframes rot {
-    0%, 40% { transform: rotate(0deg); }
-    60%, 100% { transform: rotate(-90deg); }
-  }
-
-  /* Mobile landscape: full-bleed canvas */
-  @media (max-width: 1000px) and (orientation: landscape) {
+  /* Mobile (any orientation): full-bleed canvas */
+  @media (max-width: 1000px) {
     html, body { height: 100dvh; overflow: hidden; }
     .stage {
       padding: 0;
@@ -153,13 +119,7 @@
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
     }
-    .back-btn:hover, .back-btn:active { opacity: 1; }
-  }
-
-  /* Mobile portrait: show rotate hint, hide game */
-  @media (max-width: 1000px) and (orientation: portrait) {
-    .stage, .topbar { display: none; }
-    .rotate-hint { display: flex; }
+    .back-btn:active { opacity: 1; }
   }
 </style>
 </head>
@@ -176,32 +136,26 @@
   <canvas id="game" width="840" height="600"></canvas>
 </div>
 <script>
-  // Pre-game: on mobile landscape, widen the canvas's internal width to
-  // match the viewport aspect so CSS stretching doesn't distort the ball
-  // (circle) or squish the keys horizontally. The game reads canvas.width
-  // on init, so this must run before the game IIFE below.
+  // Pre-game: on mobile, size the canvas's internal dimensions to match the
+  // viewport aspect so CSS stretching doesn't distort the ball (circle) or
+  // skew keys. Portrait gets a taller game field (longer ball travel);
+  // landscape stays wider. The game IIFE below reads these dimensions on init.
   (() => {
-    if (!window.matchMedia('(max-width: 1000px) and (orientation: landscape)').matches) return;
+    if (!window.matchMedia('(max-width: 1000px)').matches) return;
     const canvas = document.getElementById('game');
-    const targetAspect = window.innerWidth / window.innerHeight;
-    const canvasAspect = canvas.width / canvas.height;
-    if (targetAspect > canvasAspect) {
-      canvas.width = Math.min(2000, Math.round(canvas.height * targetAspect));
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (vh >= vw) {
+      // Portrait: longer dimension is vertical — give the ball more travel
+      canvas.height = 900;
+      canvas.width = Math.max(360, Math.round(900 * vw / vh));
+    } else {
+      // Landscape: match viewport aspect, keep game height at 600
+      canvas.height = 600;
+      canvas.width = Math.min(2000, Math.round(600 * vw / vh));
     }
   })();
 </script>
-<div class="rotate-hint" role="dialog" aria-label="Rotate your device">
-  <a class="back-btn" href="/" style="position:absolute;top:14px;left:14px;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    <span>Back</span>
-  </a>
-  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="5" y="2" width="14" height="20" rx="2"/>
-    <line x1="12" y1="18" x2="12" y2="18"/>
-  </svg>
-  <p>Rotate your phone to play</p>
-  <small>Breakout Piano is best in landscape</small>
-</div>
 <script>
 (() => {
   const canvas = document.getElementById('game');
@@ -500,7 +454,8 @@
     // watermark — sits on the background above the keys, below gameplay
     ctx.save();
     ctx.fillStyle = 'rgba(255, 220, 200, 0.10)';
-    ctx.font = 'bold 72px -apple-system, system-ui, sans-serif';
+    const watermarkSize = Math.min(72, Math.round(W * 0.13));
+    ctx.font = `bold ${watermarkSize}px -apple-system, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('RobinBlocks.com', W / 2, (paddle.y + paddle.h + KEYBOARD_TOP) / 2);
