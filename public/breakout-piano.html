@@ -312,7 +312,9 @@
 
   // ---- Paddle & balls ----
   const paddle = { w: 110, h: 12, x: W/2 - 55, y: 30 };
-  const BALL_SPEED = 8.5;
+  const BALL_SPEED = 5.5;
+  const BALL_SPEED_MAX = 14;
+  const BALL_SPEED_MULT = 1.07;
   const BALL_R = 8;
   let balls = [];
   let score = 0, gameOver = false, won = false, launchedOnce = false;
@@ -404,7 +406,8 @@
           ball.x - ball.r < paddle.x + paddle.w) {
         ball.y = paddle.y + paddle.h + ball.r;
         const hit = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
-        const speed = Math.hypot(ball.vx, ball.vy) || BALL_SPEED;
+        const cur = Math.hypot(ball.vx, ball.vy) || BALL_SPEED;
+        const speed = Math.min(BALL_SPEED_MAX, cur * BALL_SPEED_MULT);
         const angle = hit * (Math.PI / 3);
         ball.vx = Math.sin(angle) * speed;
         ball.vy = Math.cos(angle) * speed;
@@ -463,14 +466,19 @@
   const draw = () => {
     ctx.clearRect(0, 0, W, H);
 
-    // watermark — sits on the background above the keys, below gameplay
+    // watermark + score — centered in the open play field between paddle and keys
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 220, 200, 0.10)';
     const watermarkSize = Math.min(72, Math.round(W * 0.13));
+    const scoreSize = Math.min(96, Math.round(W * 0.18));
+    const fieldMid = (paddle.y + paddle.h + KEYBOARD_TOP) / 2;
+    ctx.fillStyle = 'rgba(255, 220, 200, 0.10)';
     ctx.font = `bold ${watermarkSize}px -apple-system, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('RobinBlocks.com', W / 2, (paddle.y + paddle.h + KEYBOARD_TOP) / 2);
+    ctx.fillText('RobinBlocks.com', W / 2, fieldMid - scoreSize * 0.45);
+    ctx.fillStyle = 'rgba(255, 220, 200, 0.22)';
+    ctx.font = `bold ${scoreSize}px -apple-system, system-ui, sans-serif`;
+    ctx.fillText('Score: ' + score, W / 2, fieldMid + watermarkSize * 0.5);
     ctx.restore();
 
     ctx.fillStyle = '#e8e8e8';
@@ -489,15 +497,6 @@
       ctx.strokeStyle = '#b8860b';
       ctx.stroke();
     }
-
-    ctx.fillStyle = '#bbb';
-    ctx.font = '14px -apple-system, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('Score: ' + score, 12, 20);
-    ctx.textAlign = 'center';
-    ctx.fillText('Balls: ' + balls.length, W / 2, 20);
-    ctx.textAlign = 'right';
-    ctx.fillText('Slices left: ' + blocks.filter(b => b.alive).length, W - 12, 20);
 
     if (!launchedOnce && !gameOver && !won) {
       ctx.fillStyle = '#888';
