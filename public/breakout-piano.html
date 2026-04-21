@@ -132,7 +132,7 @@
   <div class="brand"><b>Breakout Piano</b> · robinblocks.com</div>
 </div>
 <div class="stage">
-  <div id="hint">Move mouse to aim paddle · Click to launch (click again for more balls)</div>
+  <div id="hint">Move mouse to aim paddle · Click to launch · Keep the ball alive for 3 lives</div>
   <canvas id="game" width="840" height="600"></canvas>
 </div>
 <audio id="silent-loop" src="/silent.wav" loop preload="auto" playsinline style="display:none"></audio>
@@ -311,16 +311,27 @@
   };
 
   // ---- Paddle & balls ----
-  const paddle = { w: 110, h: 12, x: W/2 - 55, y: 30 };
+  const PADDLE_W_FULL = 110;
+  const PADDLE_W_SHRUNK = 85;
+  const paddle = { w: PADDLE_W_FULL, h: 12, x: W/2 - PADDLE_W_FULL/2, y: 30 };
   const BALL_SPEED = 5.5;
   const BALL_SPEED_MAX = 14;
   const BALL_SPEED_MULT = 1.07;
   const BALL_R = 8;
+  const MAX_LIVES = 3;
+  const MAX_MULT = 8;
+  const SHRINK_THRESHOLD = 50; // dead blocks needed to shrink paddle
+
   let balls = [];
-  let score = 0, gameOver = false, won = false, launchedOnce = false;
+  let score = 0;
+  let gameOver = false, won = false;
+  let lives = MAX_LIVES;
+  let multiplier = 1;
+  let peakMultiplier = 1;
+  let paddleShrunk = false;
+  let shakeUntil = 0, flashUntil = 0, lostDotAt = 0;
 
   const launchBall = () => {
-    launchedOnce = true;
     balls.push({
       x: paddle.x + paddle.w / 2,
       y: paddle.y + paddle.h + BALL_R + 2,
@@ -334,7 +345,14 @@
     buildBlocks();
     balls = [];
     score = 0;
-    gameOver = false; won = false; launchedOnce = false;
+    gameOver = false; won = false;
+    lives = MAX_LIVES;
+    multiplier = 1;
+    peakMultiplier = 1;
+    paddleShrunk = false;
+    paddle.w = PADDLE_W_FULL;
+    paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x + (PADDLE_W_FULL - paddle.w) / 2));
+    shakeUntil = 0; flashUntil = 0; lostDotAt = 0;
   };
 
   // ---- Input ----
@@ -345,8 +363,9 @@
   };
   const fireClick = () => {
     initAudio();
-    if (gameOver || won) { resetGame(); launchBall(); return; }
-    launchBall();
+    if (gameOver || won) { resetGame(); return; }   // reset → docked, next tap launches
+    if (balls.length === 0 && lives > 0) launchBall();
+    // else: ball in flight, swallow the tap (audio already unlocked)
   };
 
   canvas.addEventListener('mousemove', (e) => aimPaddle(e.clientX));
@@ -413,7 +432,19 @@
         ball.vy = Math.cos(angle) * speed;
       }
 
-      if (ball.y + ball.r < 0) { balls.splice(i, 1); continue; }
+      if (ball.y + ball.r < 0) {
+        balls.splice(i, 1);
+        lives--;
+        multiplier = 1;
+        const now = performance.now();
+        shakeUntil = now + 250;
+        flashUntil = now + 150;
+        lostDotAt = now;
+        // Descending tritone stinger
+        playNote(noteFreq('C5'));
+        setTimeout(() => { try { playNote(noteFreq('F#4')); } catch (e) {} }, 80);
+        continue;
+      }
 
       let best = null, bestA = 0;
       for (const b of blocks) {
@@ -425,13 +456,26 @@
         best.alive = false;
         best.flash = 1;
         playNote(best.freq);
-        score++;
+        score += multiplier;
+        multiplier = Math.min(MAX_MULT, multiplier + 1);
+        if (multiplier > peakMultiplier) peakMultiplier = multiplier;
         resolveBounce(ball, best);
       }
     }
 
+    // Paddle shrink at half cleared
+    if (!paddleShrunk) {
+      const dead = blocks.reduce((n, b) => n + (b.alive ? 0 : 1), 0);
+      if (dead >= SHRINK_THRESHOLD) {
+        const center = paddle.x + paddle.w / 2;
+        paddle.w = PADDLE_W_SHRUNK;
+        paddle.x = Math.max(0, Math.min(W - paddle.w, center - paddle.w / 2));
+        paddleShrunk = true;
+      }
+    }
+
     if (blocks.every(b => !b.alive)) won = true;
-    else if (launchedOnce && balls.length === 0) gameOver = true;
+    else if (lives === 0 && balls.length === 0) gameOver = true;
   };
 
   // ---- Draw ----
@@ -463,11 +507,28 @@
     ctx.globalAlpha = 1;
   };
 
+  const drawBall = (x, y) => {
+    ctx.fillStyle = '#ffd23a';
+    ctx.beginPath();
+    ctx.arc(x, y, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#b8860b';
+    ctx.stroke();
+  };
+
   const draw = () => {
+    const now = performance.now();
     ctx.clearRect(0, 0, W, H);
 
-    // watermark + score — centered in the open play field between paddle and keys
+    // Everything inside save/restore participates in the shake transform
     ctx.save();
+    if (now < shakeUntil) {
+      const t = (shakeUntil - now) / 250;
+      const amp = 6 * t;
+      ctx.translate((Math.random() - 0.5) * amp * 2, (Math.random() - 0.5) * amp * 2);
+    }
+
+    // watermark + score — centered in the open play field between paddle and keys
     const watermarkSize = Math.min(72, Math.round(W * 0.13));
     const scoreSize = Math.min(96, Math.round(W * 0.18));
     const fieldMid = (paddle.y + paddle.h + KEYBOARD_TOP) / 2;
@@ -479,41 +540,95 @@
     ctx.fillStyle = 'rgba(255, 220, 200, 0.22)';
     ctx.font = `bold ${scoreSize}px -apple-system, system-ui, sans-serif`;
     ctx.fillText('Score: ' + score, W / 2, fieldMid + watermarkSize * 0.5);
-    ctx.restore();
 
+    // Combo chip (only when > 1)
+    if (multiplier > 1) {
+      const chipSize = Math.round(scoreSize * 0.42);
+      ctx.fillStyle = 'rgba(255, 180, 100, 0.45)';
+      ctx.font = `bold ${chipSize}px -apple-system, system-ui, sans-serif`;
+      ctx.fillText('×' + multiplier, W / 2, fieldMid + watermarkSize * 0.5 + scoreSize * 0.7);
+    }
+
+    // Paddle
     ctx.fillStyle = '#e8e8e8';
     ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
     ctx.fillStyle = '#ff6a00';
     ctx.fillRect(paddle.x, paddle.y + paddle.h - 2, paddle.w, 2);
 
+    // Blocks
     for (const b of blocks) drawSlice(b);
     for (const b of blocks) if (!b.alive && b.flash > 0) b.flash -= 0.06;
 
-    for (const ball of balls) {
-      ctx.fillStyle = '#ffd23a';
-      ctx.beginPath();
-      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#b8860b';
-      ctx.stroke();
+    // Active balls
+    for (const ball of balls) drawBall(ball.x, ball.y);
+
+    // Docked ball (waiting to be launched)
+    const docked = !gameOver && !won && balls.length === 0 && lives > 0;
+    if (docked) {
+      drawBall(paddle.x + paddle.w / 2, paddle.y + paddle.h + BALL_R + 2);
     }
 
-    if (!launchedOnce && !gameOver && !won) {
-      ctx.fillStyle = '#888';
+    // Lives dots (top-right, leftmost = life #1)
+    const dotR = 5, dotGap = 14, dotPad = 16;
+    for (let i = 0; i < MAX_LIVES; i++) {
+      const cx = W - dotPad - (MAX_LIVES - 1 - i) * dotGap;
+      const cy = dotPad + 4;
+      if (i < lives) {
+        ctx.fillStyle = '#ff6a00';
+        ctx.beginPath();
+        ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (i === lives && lostDotAt > 0 && now - lostDotAt < 200) {
+        // Pop animation: scale 1 → 1.4 → 0
+        const t = (now - lostDotAt) / 200;
+        const scale = t < 0.3 ? 1 + (t / 0.3) * 0.4 : 1.4 * (1 - (t - 0.3) / 0.7);
+        ctx.fillStyle = `rgba(255, 106, 0, ${Math.max(0, 1 - t)})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, dotR * Math.max(0, scale), 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = 'rgba(255, 200, 150, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // Launch hint when docked (only on desktop — the bottom CSS hint also hidden on mobile)
+    if (docked && lives === MAX_LIVES && score === 0) {
+      ctx.fillStyle = '#aaa';
       ctx.font = '14px -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('click to launch (click again for more balls)', W / 2, paddle.y + 34);
+      ctx.fillText('tap to launch', W / 2, paddle.y + paddle.h + BALL_R * 2 + 26);
     }
+
+    ctx.restore();
+
+    // Red vignette flash — outside shake so it's screen-fixed
+    if (now < flashUntil) {
+      const t = (flashUntil - now) / 150;
+      const grad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.6);
+      grad.addColorStop(0, 'rgba(255,0,0,0)');
+      grad.addColorStop(1, `rgba(255,0,0,${0.45 * t})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+
     if (gameOver || won) {
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(0, H / 2 - 60, W, 120);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, H / 2 - 80, W, 160);
       ctx.fillStyle = '#fff';
       ctx.font = '36px -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(won ? 'You cleared the keyboard!' : 'Game Over', W / 2, H / 2 - 6);
-      ctx.font = '16px -apple-system, sans-serif';
-      ctx.fillStyle = '#ddd';
-      ctx.fillText('click to play again', W / 2, H / 2 + 26);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(won ? 'You cleared the keyboard!' : 'Game Over', W / 2, H / 2 - 32);
+      ctx.font = '18px -apple-system, sans-serif';
+      ctx.fillStyle = '#e8d8cc';
+      ctx.fillText(`Score ${score}   ·   Peak combo ×${peakMultiplier}`, W / 2, H / 2);
+      ctx.font = '15px -apple-system, sans-serif';
+      ctx.fillStyle = '#bbb';
+      ctx.fillText('tap to play again', W / 2, H / 2 + 32);
     }
   };
 
