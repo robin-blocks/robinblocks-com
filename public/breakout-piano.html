@@ -135,6 +135,7 @@
   <div id="hint">Move mouse to aim paddle · Click to launch (click again for more balls)</div>
   <canvas id="game" width="840" height="600"></canvas>
 </div>
+<audio id="silent-loop" src="/silent.wav" loop preload="auto" playsinline style="display:none"></audio>
 <script>
   // Pre-game: on mobile, size the canvas's internal dimensions to match the
   // viewport aspect so CSS stretching doesn't distort the ball (circle) or
@@ -163,19 +164,30 @@
   const W = canvas.width, H = canvas.height;
 
   // ---- Audio ----
+  // Two-layer iOS unlock: (1) resume AudioContext + play a silent buffer so
+  // the WebAudio graph is unblocked for later async oscillators; (2) kick
+  // the preloaded <audio id="silent-loop"> so the iOS audio session
+  // switches from "Ambient" (respects mute switch) to "Playback" (ignores
+  // it). Both must run inside a user gesture.
   let audio;
+  const silentEl = document.getElementById('silent-loop');
+  if (silentEl) silentEl.volume = 0.001;
+
   const initAudio = () => {
     if (!audio) {
-      audio = new (window.AudioContext || window.webkitAudioContext)();
-      // iOS unlock: play a silent buffer inside the user gesture so the
-      // context is truly unlocked for later async sounds (ball/block hits).
-      const buf = audio.createBuffer(1, 1, 22050);
+      try {
+        audio = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) { return; }
+    }
+    if (audio.state === 'suspended') audio.resume().catch(() => {});
+    try {
+      const buf = audio.createBuffer(1, Math.max(1, (audio.sampleRate * 0.05) | 0), audio.sampleRate);
       const src = audio.createBufferSource();
       src.buffer = buf;
       src.connect(audio.destination);
       src.start(0);
-    }
-    if (audio.state === 'suspended') audio.resume();
+    } catch (e) {}
+    if (silentEl && silentEl.paused) silentEl.play().catch(() => {});
   };
   const playNote = (freq) => {
     if (!audio) return;
