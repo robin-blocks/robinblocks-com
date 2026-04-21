@@ -1,367 +1,439 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Breakout Piano · Robin Blocks</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0b0b10;
-    --ink: #f5f5f1;
-    --ink-2: #b0b0aa;
-    --rule: #1e1e24;
-    --accent: oklch(0.72 0.17 75);
+    --bg: #2a1820;
+    --ink: #e8d8cc;
+    --ink-2: #c9a89a;
+    --ink-3: #8e6a6a;
+    --chrome: rgba(255,255,255,0.06);
+    --chrome-hover: rgba(255,255,255,0.12);
+    --chrome-border: rgba(255,255,255,0.08);
   }
   * { box-sizing: border-box; }
-  html, body { margin:0; padding:0; background: var(--bg); color: var(--ink); font-family: 'Inter', sans-serif; min-height: 100vh; }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 20px 20px 40px; }
-  .back {
-    display: inline-flex; align-items: center; gap: 6px;
-    color: var(--ink-2); text-decoration: none; font-size: 13.5px; font-weight: 500;
-    padding: 8px 12px; border-radius: 8px; border: 1px solid var(--rule);
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: var(--ink);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
   }
-  .back:hover { color: var(--ink); background: var(--rule); }
-  h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; margin: 18px 0 6px; }
-  .sub { color: var(--ink-2); margin: 0 0 18px; font-size: 15px; }
-  .hud {
-    display: flex; gap: 18px; align-items: center;
-    padding: 10px 14px; border: 1px solid var(--rule); border-radius: 12px;
-    background: rgba(255,255,255,.02);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    z-index: 10;
+    pointer-events: none;
   }
-  .hud b { font-weight: 600; color: var(--accent); margin-left: 6px; }
-  canvas {
-    display: block;
-    width: 100%;
-    max-width: 780px;
-    aspect-ratio: 4 / 3;
-    background: #08080c;
-    border: 1px solid var(--rule);
-    border-radius: 14px;
-    touch-action: none;
-  }
-  .controls {
-    margin-top: 14px;
-    display: flex; gap: 10px; flex-wrap: wrap;
-  }
-  button.btn {
-    padding: 10px 16px;
-    background: var(--accent);
-    color: #1a1a1a;
-    font: inherit;
-    font-weight: 600;
-    border: none;
+  .topbar > * { pointer-events: auto; }
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
     border-radius: 10px;
+    color: var(--ink);
+    background: var(--chrome);
+    border: 1px solid var(--chrome-border);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
     cursor: pointer;
+    transition: background .15s, border-color .15s, transform .15s;
   }
-  button.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
-  .hint { margin-top: 18px; color: var(--ink-2); font-size: 13px; line-height: 1.6; }
-  .kbd { display: inline-block; padding: 1px 6px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink); }
+  .back-btn:hover {
+    background: var(--chrome-hover);
+    border-color: rgba(255,255,255,0.18);
+  }
+  .back-btn:active { transform: translateY(1px); }
+  .back-btn svg { display: block; }
+  .brand {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .brand b { color: var(--ink); font-weight: 700; letter-spacing: -0.01em; }
+  .stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 80px 16px 32px;
+  }
+  #hint {
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  canvas {
+    background: #5b2d3d;
+    border: 1px solid #3a1a26;
+    border-radius: 10px;
+    cursor: none;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.55);
+    max-width: 100%;
+    height: auto;
+  }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <a class="back" href="/">← Back to list</a>
-    <h1>Breakout Piano 🎹</h1>
-    <p class="sub">Hit the bricks — each one is a piano key. Clear a row to play a scale.</p>
-    <div class="hud">
-      <span>Score <b id="score">0</b></span>
-      <span>Lives <b id="lives">3</b></span>
-      <span>Notes <b id="notes">0</b></span>
-      <span>Level <b id="level">1</b></span>
-    </div>
-    <canvas id="game" width="780" height="585"></canvas>
-    <div class="controls">
-      <button class="btn" id="startBtn">Start</button>
-      <button class="btn ghost" id="muteBtn">🔊 Sound</button>
-      <button class="btn ghost" id="resetBtn">Reset</button>
-    </div>
-    <p class="hint">
-      Move with <span class="kbd">←</span> <span class="kbd">→</span> or mouse · launch with <span class="kbd">Space</span> · bricks ring chromatically from C4. Clear the row for a glissando.
-    </p>
-  </div>
-
+<div class="topbar">
+  <a class="back-btn" href="/" aria-label="Back to home">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <span>Back</span>
+  </a>
+  <div class="brand"><b>Breakout Piano</b> · robinblocks.com</div>
+</div>
+<div class="stage">
+  <div id="hint">Move mouse to aim paddle · Click to launch (click again for more balls)</div>
+  <canvas id="game" width="840" height="600"></canvas>
+</div>
 <script>
+(() => {
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
 
-  // audio
-  let muted = false;
-  let ac;
-  function ensureAudio() {
-    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-    if (ac.state === 'suspended') ac.resume();
-  }
-  function playNote(midi, dur = 0.32, vel = 0.18) {
-    if (muted) return;
-    ensureAudio();
-    const freq = 440 * Math.pow(2, (midi - 69) / 12);
-    const t = ac.currentTime;
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
+  // ---- Audio ----
+  let audio;
+  const initAudio = () => {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  };
+  const playNote = (freq) => {
+    if (!audio) return;
+    const t = audio.currentTime;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
     osc.type = 'triangle';
     osc.frequency.value = freq;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vel, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    osc.connect(g); g.connect(ac.destination);
-    osc.start(t); osc.stop(t + dur + 0.05);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(t);
+    osc.stop(t + 0.85);
+  };
+
+  // ---- Notes ----
+  const SEMI = { C:-9, 'C#':-8, D:-7, 'D#':-6, E:-5, F:-4, 'F#':-3, G:-2, 'G#':-1, A:0, 'A#':1, B:2 };
+  const noteFreq = (n) => {
+    const m = n.match(/([A-G]#?)(\d)/);
+    const semis = SEMI[m[1]] + (parseInt(m[2]) - 4) * 12;
+    return 440 * Math.pow(2, semis / 12);
+  };
+
+  // ---- Keyboard layout ----
+  // Grid: each white key spans 4 sub-columns; each black key spans 2 sub-columns
+  // straddling the boundary between two whites. In the lower region (below the
+  // black-key line) whites extend their full 4 sub-columns side-by-side. In the
+  // upper region the black keys "steal" 1 sub-column from each adjacent white,
+  // yielding C/E/F/B with 3-wide tops and D/G/A with 2-wide tops — the real
+  // piano geometry. Nothing overlaps — each cell is a distinct block.
+  const WHITES_IN_OCT = ['C','D','E','F','G','A','B'];
+  const BLACK_AFTER = { C:'C#', D:'D#', F:'F#', G:'G#', A:'A#' };
+  const UW = 4;                // sub-columns per white key (bottom width)
+  const UB = 2;                // sub-columns per black key (centered on boundary)
+  const NUM_OCTAVES = 2;
+  const totalSubcols = NUM_OCTAVES * WHITES_IN_OCT.length * UW;
+  const unitPx = W / totalSubcols;
+
+  const whites = [];
+  const blacks = [];
+  {
+    let cursor = 0;
+    for (let o = 0; o < NUM_OCTAVES; o++) {
+      const oct = 4 + o;
+      for (const letter of WHITES_IN_OCT) {
+        const note = letter + oct;
+        whites.push({
+          note, letter, oct, freq: noteFreq(note),
+          bStart: cursor, bEnd: cursor + UW,
+          tStart: cursor, tEnd: cursor + UW,
+        });
+        cursor += UW;
+      }
+    }
+    for (let i = 0; i < whites.length; i++) {
+      const w = whites[i];
+      const bk = BLACK_AFTER[w.letter];
+      const nextW = whites[i + 1];
+      if (!bk || !nextW) continue;
+      const boundary = w.bEnd;
+      const tStart = boundary - UB / 2;
+      const tEnd = boundary + UB / 2;
+      const note = bk + w.oct;
+      blacks.push({ note, freq: noteFreq(note), tStart, tEnd });
+      w.tEnd = tStart;          // black shaves the right of this white's top
+      nextW.tStart = tEnd;      // and the left of the next white's top
+    }
   }
 
-  // bricks: grid of piano keys
-  const ROWS = 4;
-  const COLS = 14;
-  const BRICK_PAD = 4;
-  const BRICK_TOP = 50;
-  const BRICK_W = (W - 2*20 - (COLS-1)*BRICK_PAD) / COLS;
-  const BRICK_H = 28;
+  // ---- Vertical dimensions ----
+  const WKH = 160;              // white key total length
+  const BKH = 96;               // black key length / upper-region height
+  const KEYBOARD_TOP = H - WKH;
+  const MID = KEYBOARD_TOP + BKH;
+  const TOP_SLICES = 3;         // slices in the upper region
+  const BOT_SLICES = 2;         // slices in the lower region (whites only)
 
-  let bricks = [];
-  let paddle, ball, score, lives, notes, level, running, launched;
+  // ---- Blocks ----
+  const blocks = [];
+  const buildBlocks = () => {
+    blocks.length = 0;
+    const topSliceH = BKH / TOP_SLICES;
+    const botSliceH = (WKH - BKH) / BOT_SLICES;
 
-  // determine which keys are "black" in a chromatic pattern
-  function isBlack(midi) {
-    const m = ((midi % 12) + 12) % 12;
-    return [1,3,6,8,10].includes(m);
-  }
-
-  function resetBricks() {
-    bricks = [];
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const midi = 60 + c + (ROWS - 1 - r) * 2; // ascending rows and cols
-        bricks.push({
-          x: 20 + c * (BRICK_W + BRICK_PAD),
-          y: BRICK_TOP + r * (BRICK_H + BRICK_PAD),
-          w: BRICK_W, h: BRICK_H,
-          midi,
-          alive: true,
-          flash: 0,
+    for (const w of whites) {
+      // narrow upper slices
+      const tx = w.tStart * unitPx;
+      const tw = (w.tEnd - w.tStart) * unitPx;
+      for (let s = 0; s < TOP_SLICES; s++) {
+        blocks.push({
+          x: tx, y: KEYBOARD_TOP + s * topSliceH, w: tw, h: topSliceH,
+          note: w.note, freq: w.freq,
+          black: false, alive: true, flash: 0, isBottom: false,
+        });
+      }
+      // wide lower slices
+      const bx = w.bStart * unitPx;
+      const bw = (w.bEnd - w.bStart) * unitPx;
+      for (let s = 0; s < BOT_SLICES; s++) {
+        blocks.push({
+          x: bx, y: MID + s * botSliceH, w: bw, h: botSliceH,
+          note: w.note, freq: w.freq,
+          black: false, alive: true, flash: 0,
+          isBottom: s === BOT_SLICES - 1,
         });
       }
     }
-  }
 
-  function reset(full = true) {
-    paddle = { w: 110, h: 12, x: W/2 - 55, y: H - 40, speed: 9 };
-    ball = { x: W/2, y: H - 55, r: 7, vx: 0, vy: 0 };
-    launched = false;
-    if (full) {
-      score = 0; lives = 3; notes = 0; level = 1;
-      resetBricks();
+    for (const b of blacks) {
+      const bx = b.tStart * unitPx;
+      const bw = (b.tEnd - b.tStart) * unitPx;
+      for (let s = 0; s < TOP_SLICES; s++) {
+        blocks.push({
+          x: bx, y: KEYBOARD_TOP + s * topSliceH, w: bw, h: topSliceH,
+          note: b.note, freq: b.freq,
+          black: true, alive: true, flash: 0, isBottom: false,
+        });
+      }
     }
-    updateHud();
-  }
-  function updateHud() {
-    document.getElementById('score').textContent = score;
-    document.getElementById('lives').textContent = lives;
-    document.getElementById('notes').textContent = notes;
-    document.getElementById('level').textContent = level;
-  }
-
-  // input
-  const keys = {};
-  window.addEventListener('keydown', e => {
-    keys[e.code] = true;
-    if (e.code === 'Space') { e.preventDefault(); if (!launched && running) launch(); }
-  });
-  window.addEventListener('keyup', e => { keys[e.code] = false; });
-  canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (W / rect.width);
-    paddle.x = Math.max(0, Math.min(W - paddle.w, mx - paddle.w/2));
-  });
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.touches[0].clientX - rect.left) * (W / rect.width);
-    paddle.x = Math.max(0, Math.min(W - paddle.w, mx - paddle.w/2));
-  }, { passive: false });
-  canvas.addEventListener('click', () => { if (!launched && running) launch(); });
-
-  function launch() {
-    launched = true;
-    const base = 6 + level * 0.3;
-    ball.vx = (Math.random() > 0.5 ? 1 : -1) * base * 0.6;
-    ball.vy = -base;
-  }
-
-  document.getElementById('startBtn').onclick = () => {
-    ensureAudio();
-    if (!running) { running = true; loop(); }
-    if (!launched) launch();
-  };
-  document.getElementById('resetBtn').onclick = () => { reset(true); running = false; draw(); };
-  document.getElementById('muteBtn').onclick = (e) => {
-    muted = !muted;
-    e.target.textContent = muted ? '🔇 Muted' : '🔊 Sound';
   };
 
-  function step() {
-    // keyboard paddle
-    if (keys['ArrowLeft']) paddle.x -= paddle.speed;
-    if (keys['ArrowRight']) paddle.x += paddle.speed;
-    paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
+  // ---- Paddle & balls ----
+  const paddle = { w: 110, h: 12, x: W/2 - 55, y: 30 };
+  const BALL_SPEED = 8.5;
+  const BALL_R = 8;
+  let balls = [];
+  let score = 0, gameOver = false, won = false, launchedOnce = false;
 
-    if (!launched) {
-      ball.x = paddle.x + paddle.w/2;
-      ball.y = paddle.y - ball.r - 2;
-      return;
+  const launchBall = () => {
+    launchedOnce = true;
+    balls.push({
+      x: paddle.x + paddle.w / 2,
+      y: paddle.y + paddle.h + BALL_R + 2,
+      vx: (Math.random() * 2 - 1) * BALL_SPEED * 0.45,
+      vy: BALL_SPEED * 0.9,
+      r: BALL_R,
+    });
+  };
+
+  const resetGame = () => {
+    buildBlocks();
+    balls = [];
+    score = 0;
+    gameOver = false; won = false; launchedOnce = false;
+  };
+
+  // ---- Input ----
+  canvas.addEventListener('mousemove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (W / r.width);
+    paddle.x = Math.max(0, Math.min(W - paddle.w, mx - paddle.w / 2));
+  });
+  canvas.addEventListener('click', () => {
+    initAudio();
+    if (gameOver || won) { resetGame(); launchBall(); return; }
+    launchBall();
+  });
+
+  // ---- Collision ----
+  const overlapArea = (ball, b) => {
+    const dx = Math.min(ball.x + ball.r, b.x + b.w) - Math.max(ball.x - ball.r, b.x);
+    const dy = Math.min(ball.y + ball.r, b.y + b.h) - Math.max(ball.y - ball.r, b.y);
+    return dx > 0 && dy > 0 ? dx * dy : 0;
+  };
+
+  const resolveBounce = (ball, b) => {
+    const left = (ball.x + ball.r) - b.x;
+    const right = (b.x + b.w) - (ball.x - ball.r);
+    const top = (ball.y + ball.r) - b.y;
+    const bottom = (b.y + b.h) - (ball.y - ball.r);
+    const minX = Math.min(left, right);
+    const minY = Math.min(top, bottom);
+    if (minX < minY) {
+      ball.vx = -ball.vx;
+      ball.x += left < right ? -minX : minX;
+    } else {
+      ball.vy = -ball.vy;
+      ball.y += top < bottom ? -minY : minY;
     }
+  };
 
-    ball.x += ball.vx;
-    ball.y += ball.vy;
+  // ---- Update ----
+  const update = () => {
+    if (gameOver || won) return;
 
-    // walls
-    if (ball.x - ball.r < 0) { ball.x = ball.r; ball.vx *= -1; }
-    if (ball.x + ball.r > W) { ball.x = W - ball.r; ball.vx *= -1; }
-    if (ball.y - ball.r < 0) { ball.y = ball.r; ball.vy *= -1; }
+    for (let i = balls.length - 1; i >= 0; i--) {
+      const ball = balls[i];
+      ball.x += ball.vx;
+      ball.y += ball.vy;
 
-    // paddle
-    if (ball.y + ball.r > paddle.y && ball.y + ball.r < paddle.y + paddle.h + 6 &&
-        ball.x > paddle.x && ball.x < paddle.x + paddle.w && ball.vy > 0) {
-      ball.y = paddle.y - ball.r;
-      const hit = (ball.x - (paddle.x + paddle.w/2)) / (paddle.w/2);
-      const speed = Math.hypot(ball.vx, ball.vy) * 1.02;
-      const angle = hit * (Math.PI/3);
-      ball.vx = Math.sin(angle) * speed;
-      ball.vy = -Math.abs(Math.cos(angle) * speed);
-      playNote(48, 0.15, 0.08); // low thud on paddle
-    }
+      if (ball.x - ball.r < 0) { ball.x = ball.r; ball.vx = Math.abs(ball.vx); }
+      if (ball.x + ball.r > W) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx); }
+      if (ball.y + ball.r > H) { ball.y = H - ball.r; ball.vy = -Math.abs(ball.vy); }
 
-    // bricks
-    for (const b of bricks) {
-      if (!b.alive) continue;
-      if (ball.x + ball.r > b.x && ball.x - ball.r < b.x + b.w &&
-          ball.y + ball.r > b.y && ball.y - ball.r < b.y + b.h) {
-        // determine collision side
-        const prevX = ball.x - ball.vx;
-        const prevY = ball.y - ball.vy;
-        const fromTop = prevY + ball.r <= b.y;
-        const fromBot = prevY - ball.r >= b.y + b.h;
-        if (fromTop || fromBot) ball.vy *= -1;
-        else ball.vx *= -1;
-        b.alive = false;
-        b.flash = 1;
-        score += 10;
-        notes += 1;
-        playNote(b.midi, 0.4, 0.22);
-        updateHud();
-        // check row clear
-        const row = Math.round((b.y - BRICK_TOP) / (BRICK_H + BRICK_PAD));
-        const rowBricks = bricks.filter(x => Math.round((x.y - BRICK_TOP) / (BRICK_H + BRICK_PAD)) === row);
-        if (rowBricks.every(x => !x.alive)) {
-          // glissando
-          const notesArr = rowBricks.map(x => x.midi).sort((a,b)=>a-b);
-          notesArr.forEach((n,i) => setTimeout(() => playNote(n, 0.25, 0.15), i*60));
-          score += 50;
-          updateHud();
-        }
-        break;
+      if (ball.vy < 0 &&
+          ball.y - ball.r < paddle.y + paddle.h &&
+          ball.y + ball.r > paddle.y &&
+          ball.x + ball.r > paddle.x &&
+          ball.x - ball.r < paddle.x + paddle.w) {
+        ball.y = paddle.y + paddle.h + ball.r;
+        const hit = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+        const speed = Math.hypot(ball.vx, ball.vy) || BALL_SPEED;
+        const angle = hit * (Math.PI / 3);
+        ball.vx = Math.sin(angle) * speed;
+        ball.vy = Math.cos(angle) * speed;
+      }
+
+      if (ball.y + ball.r < 0) { balls.splice(i, 1); continue; }
+
+      let best = null, bestA = 0;
+      for (const b of blocks) {
+        if (!b.alive) continue;
+        const a = overlapArea(ball, b);
+        if (a > bestA) { bestA = a; best = b; }
+      }
+      if (best) {
+        best.alive = false;
+        best.flash = 1;
+        playNote(best.freq);
+        score++;
+        resolveBounce(ball, best);
       }
     }
 
-    // bottom
-    if (ball.y - ball.r > H) {
-      lives -= 1;
-      updateHud();
-      launched = false;
-      playNote(36, 0.5, 0.2);
-      if (lives <= 0) {
-        running = false;
-        setTimeout(() => { alert('Game over! Score: ' + score); reset(true); draw(); }, 50);
-      }
-    }
+    if (blocks.every(b => !b.alive)) won = true;
+    else if (launchedOnce && balls.length === 0) gameOver = true;
+  };
 
-    // all clear -> next level
-    if (bricks.every(b => !b.alive)) {
-      level += 1;
-      resetBricks();
-      launched = false;
-      updateHud();
-    }
-  }
-
-  function draw() {
-    ctx.clearRect(0,0,W,H);
-    // bg grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
-    ctx.lineWidth = 1;
-    for (let x=0; x<W; x+=30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-    // bricks
-    for (const b of bricks) {
-      if (!b.alive) continue;
-      const black = isBlack(b.midi);
-      ctx.fillStyle = black ? '#17171d' : '#f5f5f1';
-      if (b.flash > 0) {
-        ctx.fillStyle = `oklch(0.80 0.18 ${75 - (b.midi-60)*8})`;
-      }
-      roundRect(ctx, b.x, b.y, b.w, b.h, 4, true, false);
-      // top hairline
-      ctx.strokeStyle = black ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(b.x+1, b.y+1); ctx.lineTo(b.x + b.w - 1, b.y + 1); ctx.stroke();
-      // key label
-      if (!black) {
-        ctx.fillStyle = 'rgba(0,0,0,.35)';
-        ctx.font = '10px "JetBrains Mono", monospace';
+  // ---- Draw ----
+  const drawSlice = (b) => {
+    const alpha = b.alive ? 1 : Math.max(0, b.flash);
+    if (!b.alive && alpha <= 0) return;
+    ctx.globalAlpha = alpha;
+    if (b.black) {
+      const g = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
+      g.addColorStop(0, '#2a2a2a'); g.addColorStop(1, '#000');
+      ctx.fillStyle = g;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+    } else {
+      const g = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
+      g.addColorStop(0, '#fafafa'); g.addColorStop(1, '#dcdcdc');
+      ctx.fillStyle = g;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+      ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+      if (b.isBottom) {
+        ctx.fillStyle = '#888';
+        ctx.font = '11px -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-        ctx.fillText(names[((b.midi%12)+12)%12], b.x + b.w/2, b.y + b.h - 8);
+        ctx.fillText(b.note, b.x + b.w / 2, b.y + b.h - 8);
       }
     }
+    ctx.globalAlpha = 1;
+  };
 
-    // paddle
-    ctx.fillStyle = '#f5f5f1';
-    roundRect(ctx, paddle.x, paddle.y, paddle.w, paddle.h, 6, true, false);
-    // ball
-    ctx.fillStyle = 'oklch(0.80 0.18 75)';
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
-    ctx.fill();
+  const draw = () => {
+    ctx.clearRect(0, 0, W, H);
 
-    if (!launched && running) {
-      ctx.fillStyle = 'rgba(245,245,241,0.7)';
-      ctx.font = '600 14px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Click or press Space to launch', W/2, H - 70);
+    // watermark — sits on the background above the keys, below gameplay
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 220, 200, 0.10)';
+    ctx.font = 'bold 72px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('RobinBlocks.com', W / 2, (paddle.y + paddle.h + KEYBOARD_TOP) / 2);
+    ctx.restore();
+
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    ctx.fillStyle = '#ff6a00';
+    ctx.fillRect(paddle.x, paddle.y + paddle.h - 2, paddle.w, 2);
+
+    for (const b of blocks) drawSlice(b);
+    for (const b of blocks) if (!b.alive && b.flash > 0) b.flash -= 0.06;
+
+    for (const ball of balls) {
+      ctx.fillStyle = '#ffd23a';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b8860b';
+      ctx.stroke();
     }
-    if (!running) {
-      ctx.fillStyle = 'rgba(245,245,241,0.6)';
-      ctx.font = '600 16px Inter, sans-serif';
+
+    ctx.fillStyle = '#bbb';
+    ctx.font = '14px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Score: ' + score, 12, 20);
+    ctx.textAlign = 'center';
+    ctx.fillText('Balls: ' + balls.length, W / 2, 20);
+    ctx.textAlign = 'right';
+    ctx.fillText('Slices left: ' + blocks.filter(b => b.alive).length, W - 12, 20);
+
+    if (!launchedOnce && !gameOver && !won) {
+      ctx.fillStyle = '#888';
+      ctx.font = '14px -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Press Start to play', W/2, H/2);
+      ctx.fillText('click to launch (click again for more balls)', W / 2, paddle.y + 34);
     }
-  }
+    if (gameOver || won) {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(0, H / 2 - 60, W, 120);
+      ctx.fillStyle = '#fff';
+      ctx.font = '36px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(won ? 'You cleared the keyboard!' : 'Game Over', W / 2, H / 2 - 6);
+      ctx.font = '16px -apple-system, sans-serif';
+      ctx.fillStyle = '#ddd';
+      ctx.fillText('click to play again', W / 2, H / 2 + 26);
+    }
+  };
 
-  function roundRect(ctx, x, y, w, h, r, fill, stroke) {
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    ctx.closePath();
-    if (fill) ctx.fill();
-    if (stroke) ctx.stroke();
-  }
+  const loop = () => { update(); draw(); requestAnimationFrame(loop); };
 
-  function loop() {
-    if (!running) { draw(); return; }
-    step();
-    draw();
-    requestAnimationFrame(loop);
-  }
-
-  reset(true);
-  draw();
+  buildBlocks();
+  loop();
+})();
 </script>
 </body>
 </html>
