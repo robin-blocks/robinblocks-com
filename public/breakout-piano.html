@@ -88,6 +88,72 @@
     box-shadow: 0 20px 60px -20px rgba(0,0,0,0.55);
     max-width: 100%;
     height: auto;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .rotate-hint {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 24px;
+    text-align: center;
+    z-index: 20;
+  }
+  .rotate-hint svg {
+    color: var(--ink-2);
+    animation: rot 2.4s ease-in-out infinite;
+  }
+  .rotate-hint p {
+    margin: 0;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .rotate-hint small {
+    color: var(--ink-3);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  @keyframes rot {
+    0%, 40% { transform: rotate(0deg); }
+    60%, 100% { transform: rotate(-90deg); }
+  }
+
+  /* Mobile landscape: full-bleed canvas */
+  @media (max-width: 1000px) and (orientation: landscape) {
+    .stage { padding: 0; min-height: 100vh; }
+    #hint { display: none; }
+    .brand { display: none; }
+    canvas {
+      width: min(100vw, calc(100vh * 840 / 600));
+      height: min(100vh, calc(100vw * 600 / 840));
+      max-width: none;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .topbar { padding: 10px 12px; }
+    .back-btn {
+      padding: 6px 10px;
+      font-size: 12.5px;
+      opacity: 0.7;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .back-btn:hover, .back-btn:active { opacity: 1; }
+  }
+
+  /* Mobile portrait: show rotate hint, hide game */
+  @media (max-width: 1000px) and (orientation: portrait) {
+    .stage, .topbar { display: none; }
+    .rotate-hint { display: flex; }
   }
 </style>
 </head>
@@ -102,6 +168,18 @@
 <div class="stage">
   <div id="hint">Move mouse to aim paddle · Click to launch (click again for more balls)</div>
   <canvas id="game" width="840" height="600"></canvas>
+</div>
+<div class="rotate-hint" role="dialog" aria-label="Rotate your device">
+  <a class="back-btn" href="/" style="position:absolute;top:14px;left:14px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <span>Back</span>
+  </a>
+  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="2" width="14" height="20" rx="2"/>
+    <line x1="12" y1="18" x2="12" y2="18"/>
+  </svg>
+  <p>Rotate your phone to play</p>
+  <small>Breakout Piano is best in landscape</small>
 </div>
 <script>
 (() => {
@@ -262,16 +340,30 @@
   };
 
   // ---- Input ----
-  canvas.addEventListener('mousemove', (e) => {
+  const aimPaddle = (clientX) => {
     const r = canvas.getBoundingClientRect();
-    const mx = (e.clientX - r.left) * (W / r.width);
+    const mx = (clientX - r.left) * (W / r.width);
     paddle.x = Math.max(0, Math.min(W - paddle.w, mx - paddle.w / 2));
-  });
-  canvas.addEventListener('click', () => {
+  };
+  const fireClick = () => {
     initAudio();
     if (gameOver || won) { resetGame(); launchBall(); return; }
     launchBall();
-  });
+  };
+
+  canvas.addEventListener('mousemove', (e) => aimPaddle(e.clientX));
+  canvas.addEventListener('click', fireClick);
+
+  // Touch: drag to aim, tap to launch. preventDefault stops page scroll/zoom.
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches[0]) aimPaddle(e.touches[0].clientX);
+    fireClick();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches[0]) aimPaddle(e.touches[0].clientX);
+  }, { passive: false });
 
   // ---- Collision ----
   const overlapArea = (ball, b) => {
