@@ -128,22 +128,28 @@
 
   /* Mobile landscape: full-bleed canvas */
   @media (max-width: 1000px) and (orientation: landscape) {
-    .stage { padding: 0; min-height: 100vh; }
+    html, body { height: 100dvh; overflow: hidden; }
+    .stage {
+      padding: 0;
+      min-height: 100dvh;
+      height: 100dvh;
+    }
     #hint { display: none; }
     .brand { display: none; }
     canvas {
-      width: min(100vw, calc(100vh * 840 / 600));
-      height: min(100vh, calc(100vw * 600 / 840));
+      width: 100vw;
+      height: 100dvh;
       max-width: none;
       border: none;
       border-radius: 0;
       box-shadow: none;
+      display: block;
     }
-    .topbar { padding: 10px 12px; }
+    .topbar { padding: 8px 10px; }
     .back-btn {
-      padding: 6px 10px;
-      font-size: 12.5px;
-      opacity: 0.7;
+      padding: 5px 9px;
+      font-size: 12px;
+      opacity: 0.65;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
     }
@@ -169,6 +175,21 @@
   <div id="hint">Move mouse to aim paddle · Click to launch (click again for more balls)</div>
   <canvas id="game" width="840" height="600"></canvas>
 </div>
+<script>
+  // Pre-game: on mobile landscape, widen the canvas's internal width to
+  // match the viewport aspect so CSS stretching doesn't distort the ball
+  // (circle) or squish the keys horizontally. The game reads canvas.width
+  // on init, so this must run before the game IIFE below.
+  (() => {
+    if (!window.matchMedia('(max-width: 1000px) and (orientation: landscape)').matches) return;
+    const canvas = document.getElementById('game');
+    const targetAspect = window.innerWidth / window.innerHeight;
+    const canvasAspect = canvas.width / canvas.height;
+    if (targetAspect > canvasAspect) {
+      canvas.width = Math.min(2000, Math.round(canvas.height * targetAspect));
+    }
+  })();
+</script>
 <div class="rotate-hint" role="dialog" aria-label="Rotate your device">
   <a class="back-btn" href="/" style="position:absolute;top:14px;left:14px;">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -190,7 +211,16 @@
   // ---- Audio ----
   let audio;
   const initAudio = () => {
-    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (!audio) {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      // iOS unlock: play a silent buffer inside the user gesture so the
+      // context is truly unlocked for later async sounds (ball/block hits).
+      const buf = audio.createBuffer(1, 1, 22050);
+      const src = audio.createBufferSource();
+      src.buffer = buf;
+      src.connect(audio.destination);
+      src.start(0);
+    }
     if (audio.state === 'suspended') audio.resume();
   };
   const playNote = (freq) => {
