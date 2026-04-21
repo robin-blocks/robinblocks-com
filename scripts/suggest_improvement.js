@@ -13,8 +13,7 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
 const CODE_FILES = [
-  'components/EmailSignup.jsx',
-  'hooks/useEmailSubscription.js',
+  'pages/index.js',
   'pages/api/subscribe.js',
 ];
 
