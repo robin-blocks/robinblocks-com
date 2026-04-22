@@ -189,7 +189,7 @@
     } catch (e) {}
     if (silentEl && silentEl.paused) silentEl.play().catch(() => {});
   };
-  const playNote = (freq) => {
+  const playNote = (freq, gainScale = 1) => {
     if (!audio) return;
     const t = audio.currentTime;
     const osc = audio.createOscillator();
@@ -197,7 +197,7 @@
     osc.type = 'triangle';
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.35 * gainScale, t + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
     osc.connect(gain).connect(audio.destination);
     osc.start(t);
@@ -210,6 +210,26 @@
     const m = n.match(/([A-G]#?)(\d)/);
     const semis = SEMI[m[1]] + (parseInt(m[2]) - 4) * 12;
     return 440 * Math.pow(2, semis / 12);
+  };
+
+  // ---- Music theory (chord detection) ----
+  const PC_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const PC_INDEX = { C:0, 'C#':1, D:2, 'D#':3, E:4, F:5, 'F#':6, G:7, 'G#':8, A:9, 'A#':10, B:11 };
+  const pitchClass = (note) => PC_INDEX[note.replace(/\d/g, '')];
+  const pcToFreq = (pc, oct) => noteFreq(PC_NAMES[pc] + oct);
+  const chordLabel = (c) => {
+    const name = c.type === 'maj' ? 'Major' : c.type === 'min' ? 'minor' : 'dim';
+    return `${PC_NAMES[c.root]} ${name}`;
+  };
+  const detectChord = (pcs) => {
+    const set = new Set(pcs);
+    if (set.size < 3) return null;
+    for (const root of set) {
+      if (set.has((root + 4) % 12) && set.has((root + 7) % 12)) return { root, type: 'maj', third: 4, fifth: 7 };
+      if (set.has((root + 3) % 12) && set.has((root + 7) % 12)) return { root, type: 'min', third: 3, fifth: 7 };
+      if (set.has((root + 3) % 12) && set.has((root + 6) % 12)) return { root, type: 'dim', third: 3, fifth: 6 };
+    }
+    return null;
   };
 
   // ---- Keyboard layout ----
@@ -321,6 +341,9 @@
   const MAX_LIVES = 3;
   const MAX_MULT = 8;
   const SHRINK_THRESHOLD = 50; // dead blocks needed to shrink paddle
+  const CHORD_WINDOW_MS = 350;
+  const CHORD_COOLDOWN_MS = 200;
+  const CHORD_BONUS_MULT = 10;
 
   let balls = [];
   let score = 0;
@@ -330,6 +353,9 @@
   let peakMultiplier = 1;
   let paddleShrunk = false;
   let shakeUntil = 0, flashUntil = 0, lostDotAt = 0;
+  let chordCooldownUntil = 0, chordFlashUntil = 0;
+  const recentHits = new Map(); // pitchClass -> last hit time
+  const floatingTexts = [];
 
   const launchBall = () => {
     balls.push({
@@ -353,6 +379,9 @@
     paddle.w = PADDLE_W_FULL;
     paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x + (PADDLE_W_FULL - paddle.w) / 2));
     shakeUntil = 0; flashUntil = 0; lostDotAt = 0;
+    chordCooldownUntil = 0; chordFlashUntil = 0;
+    recentHits.clear();
+    floatingTexts.length = 0;
   };
 
   // ---- Input ----
@@ -459,6 +488,34 @@
         score += multiplier;
         multiplier = Math.min(MAX_MULT, multiplier + 1);
         if (multiplier > peakMultiplier) peakMultiplier = multiplier;
+
+        // Chord bonus: record pitch class, look for triad in recent window
+        const hitTime = performance.now();
+        const pc = pitchClass(best.note);
+        recentHits.set(pc, hitTime);
+        for (const [p, t] of recentHits) {
+          if (hitTime - t > CHORD_WINDOW_MS) recentHits.delete(p);
+        }
+        if (hitTime >= chordCooldownUntil) {
+          const chord = detectChord(Array.from(recentHits.keys()));
+          if (chord) {
+            const bonus = CHORD_BONUS_MULT * multiplier;
+            score += bonus;
+            chordFlashUntil = hitTime + 250;
+            chordCooldownUntil = hitTime + CHORD_COOLDOWN_MS;
+            const oct = 4;
+            playNote(pcToFreq(chord.root, oct), 0.4);
+            playNote(pcToFreq((chord.root + chord.third) % 12, oct), 0.4);
+            playNote(pcToFreq((chord.root + chord.fifth) % 12, oct), 0.4);
+            floatingTexts.push({
+              text: `${chordLabel(chord)} +${bonus}`,
+              x: ball.x,
+              y: ball.y,
+              startTime: hitTime,
+            });
+          }
+        }
+
         resolveBounce(ball, best);
       }
     }
@@ -603,6 +660,22 @@
       ctx.fillText('tap to launch', W / 2, paddle.y + paddle.h + BALL_R * 2 + 26);
     }
 
+    // Floating chord banners (inside shake so they move with the world)
+    const ftFont = Math.max(18, Math.min(28, Math.round(W * 0.05)));
+    ctx.font = `bold ${ftFont}px -apple-system, system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+      const ft = floatingTexts[i];
+      const age = now - ft.startTime;
+      if (age > 1200) { floatingTexts.splice(i, 1); continue; }
+      const t = age / 1200;
+      const y = ft.y - t * 40;
+      const alpha = t < 0.5 ? 1 : Math.max(0, 1 - (t - 0.5) * 2);
+      ctx.fillStyle = `rgba(255, 220, 120, ${alpha})`;
+      ctx.fillText(ft.text, ft.x, y);
+    }
+
     ctx.restore();
 
     // Red vignette flash — outside shake so it's screen-fixed
@@ -611,6 +684,16 @@
       const grad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.6);
       grad.addColorStop(0, 'rgba(255,0,0,0)');
       grad.addColorStop(1, `rgba(255,0,0,${0.45 * t})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Gold chord-bonus vignette — also screen-fixed
+    if (now < chordFlashUntil) {
+      const t = (chordFlashUntil - now) / 250;
+      const grad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+      grad.addColorStop(0, 'rgba(255, 200, 90, 0)');
+      grad.addColorStop(1, `rgba(255, 200, 90, ${0.35 * t})`);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
     }
