@@ -729,7 +729,10 @@
     if (!won && blocks.every(b => !b.alive)) {
       won = true;
       playComposition();
-    } else if (lives === 0 && balls.length === 0) gameOver = true;
+    } else if (!gameOver && lives === 0 && balls.length === 0) {
+      gameOver = true;
+      playComposition();
+    }
   };
 
   // Play back the recorded composition. Raw gameplay gaps get clamped to
@@ -885,7 +888,7 @@
     const VISIBLE_LINES = 3;
 
     const maxLineW = W - padding * 2;
-    const BARS_PER_LINE = maxLineW > 700 ? 4 : (maxLineW > 420 ? 3 : 2);
+    const BARS_PER_LINE = maxLineW > 500 ? 3 : 2;
     const LINE_QUAVERS = BARS_PER_LINE * QUAVERS_PER_BAR;
     const contentOffset = clefW + timeSigW;
     const pxPerQuaver = (maxLineW - contentOffset) / LINE_QUAVERS;
