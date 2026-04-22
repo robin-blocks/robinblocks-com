@@ -344,6 +344,11 @@
   const CHORD_WINDOW_MS = 350;
   const CHORD_COOLDOWN_MS = 200;
   const CHORD_BONUS_MULT = 10;
+  const TOKEN_DROP_CHANCE = 0.08;   // ~1 in 12 blocks drops a token
+  const TOKEN_SPEED = 2.8;           // px/frame, slow so paddle can catch
+  const TOKEN_W = 26, TOKEN_H = 16;  // capsule dimensions
+  const TOKEN_EXTRA_BALLS = 2;
+  const MAX_BALLS = 5;
 
   let balls = [];
   let score = 0;
@@ -356,6 +361,7 @@
   let chordCooldownUntil = 0, chordFlashUntil = 0;
   const recentHits = new Map(); // pitchClass -> last hit time
   const floatingTexts = [];
+  const tokens = []; // { x, y, vy } — "+2 balls" drops rising toward paddle
 
   const launchBall = () => {
     balls.push({
@@ -382,6 +388,7 @@
     chordCooldownUntil = 0; chordFlashUntil = 0;
     recentHits.clear();
     floatingTexts.length = 0;
+    tokens.length = 0;
   };
 
   // ---- Input ----
@@ -463,15 +470,20 @@
 
       if (ball.y + ball.r < 0) {
         balls.splice(i, 1);
-        lives--;
-        multiplier = 1;
-        const now = performance.now();
-        shakeUntil = now + 250;
-        flashUntil = now + 150;
-        lostDotAt = now;
-        // Descending tritone stinger
-        playNote(noteFreq('C5'));
-        setTimeout(() => { try { playNote(noteFreq('F#4')); } catch (e) {} }, 80);
+        // Only penalize when the LAST ball exits — extra balls from
+        // power-ups are free drops (classic Breakout multiball rule).
+        if (balls.length === 0) {
+          lives--;
+          multiplier = 1;
+          const now = performance.now();
+          shakeUntil = now + 250;
+          flashUntil = now + 150;
+          lostDotAt = now;
+          tokens.length = 0; // Clear any falling tokens with the rally
+          // Descending tritone stinger
+          playNote(noteFreq('C5'));
+          setTimeout(() => { try { playNote(noteFreq('F#4')); } catch (e) {} }, 80);
+        }
         continue;
       }
 
@@ -488,6 +500,17 @@
         score += multiplier;
         multiplier = Math.min(MAX_MULT, multiplier + 1);
         if (multiplier > peakMultiplier) peakMultiplier = multiplier;
+
+        // Power-up drop: rare chance a block drops a "+2 balls" capsule
+        // that rises toward the paddle. Cap 2 in flight so cascades don't spam.
+        if (tokens.length < 2 && balls.length < MAX_BALLS && Math.random() < TOKEN_DROP_CHANCE) {
+          tokens.push({
+            x: best.x + best.w / 2,
+            y: best.y + best.h / 2,
+            vy: -TOKEN_SPEED,
+            spawnedAt: performance.now(),
+          });
+        }
 
         // Chord bonus: record pitch class, look for triad in recent window
         const hitTime = performance.now();
@@ -518,6 +541,45 @@
 
         resolveBounce(ball, best);
       }
+    }
+
+    // Token update: move toward paddle, check catch, drop if they escape
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const tk = tokens[i];
+      tk.y += tk.vy;
+      // Paddle catch — overlap with paddle rect
+      if (tk.y - TOKEN_H / 2 < paddle.y + paddle.h &&
+          tk.y + TOKEN_H / 2 > paddle.y &&
+          tk.x + TOKEN_W / 2 > paddle.x &&
+          tk.x - TOKEN_W / 2 < paddle.x + paddle.w) {
+        tokens.splice(i, 1);
+        // Add extra balls, up to cap, split from an existing ball if any
+        const source = balls[0];
+        const spawnX = source ? source.x : paddle.x + paddle.w / 2;
+        const spawnY = source ? source.y : paddle.y + paddle.h + BALL_R + 2;
+        const baseSpeed = source ? Math.hypot(source.vx, source.vy) : BALL_SPEED;
+        for (let k = 0; k < TOKEN_EXTRA_BALLS && balls.length < MAX_BALLS; k++) {
+          const angle = (Math.random() - 0.5) * (Math.PI / 2); // spread ±45°
+          balls.push({
+            x: spawnX,
+            y: spawnY,
+            vx: Math.sin(angle) * baseSpeed,
+            vy: Math.cos(angle) * baseSpeed * (source ? Math.sign(source.vy) || 1 : 1),
+            r: BALL_R,
+          });
+        }
+        // Pleasant confirmation tone
+        playNote(noteFreq('C6'), 0.5);
+        floatingTexts.push({
+          text: '+2 balls',
+          x: paddle.x + paddle.w / 2,
+          y: paddle.y + paddle.h + 24,
+          startTime: performance.now(),
+        });
+        continue;
+      }
+      // Off-screen: past the top (tokens rise in this inverted layout)
+      if (tk.y + TOKEN_H / 2 < 0) tokens.splice(i, 1);
     }
 
     // Paddle shrink at half cleared
@@ -623,6 +685,27 @@
     const docked = !gameOver && !won && balls.length === 0 && lives > 0;
     if (docked) {
       drawBall(paddle.x + paddle.w / 2, paddle.y + paddle.h + BALL_R + 2);
+    }
+
+    // Power-up tokens ("+2") rising toward paddle
+    for (const tk of tokens) {
+      const pulse = 0.8 + 0.2 * Math.sin((now - tk.spawnedAt) / 120);
+      // Capsule
+      ctx.fillStyle = `rgba(110, 230, 180, ${pulse})`;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 1;
+      const x = tk.x - TOKEN_W / 2, y = tk.y - TOKEN_H / 2;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, TOKEN_W, TOKEN_H, 8);
+      else ctx.rect(x, y, TOKEN_W, TOKEN_H);
+      ctx.fill();
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = '#0e3a2a';
+      ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('+2', tk.x, tk.y + 0.5);
     }
 
     // Lives dots (top-right, leftmost = life #1)
