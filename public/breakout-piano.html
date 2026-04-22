@@ -890,9 +890,10 @@
     const maxLineW = W - padding * 2;
     const BARS_PER_LINE = maxLineW > 500 ? 3 : 2;
     const LINE_QUAVERS = BARS_PER_LINE * QUAVERS_PER_BAR;
+    const BAR_START_PAD = 14; // breathing room between bar line (or clef) and first note slot
     const contentOffset = clefW + timeSigW;
-    const pxPerQuaver = (maxLineW - contentOffset) / LINE_QUAVERS;
-    const pxPerBar = QUAVERS_PER_BAR * pxPerQuaver;
+    const pxPerQuaver = (maxLineW - contentOffset - BARS_PER_LINE * BAR_START_PAD) / LINE_QUAVERS;
+    const pxPerBar = BAR_START_PAD + QUAVERS_PER_BAR * pxPerQuaver;
     const staffW = maxLineW;
     const staffX = (W - staffW) / 2;
 
@@ -1097,7 +1098,7 @@
 
         // Draw notes + rests
         for (const e of barEls) {
-          const x = barX + e.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
+          const x = barX + e.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
           if (e.type === 'note') {
             const step = staffStep(e.note);
             const isSharp = e.note.replace(/\d/g, '').length === 2;
@@ -1113,8 +1114,8 @@
 
         // Draw beams on top of stems
         for (const { e1, e2, up } of beamPairs) {
-          const x1 = barX + e1.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
-          const x2 = barX + e2.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
+          const x1 = barX + e1.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
+          const x2 = barX + e2.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
           const y1 = yForStep(staffStep(e1.note), y0);
           const y2 = yForStep(staffStep(e2.note), y0);
           const tip1 = up ? y1 - stemLen : y1 + stemLen;
@@ -1143,7 +1144,7 @@
           const contentStart = staffX + contentOffset;
           const barWithinLine = activeEl.bar - activeLineIdx * BARS_PER_LINE;
           const barX = contentStart + barWithinLine * pxPerBar;
-          const x = barX + activeEl.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
+          const x = barX + activeEl.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
           const n = composition[playbackIndex];
           const step = staffStep(n.note);
           const y = yForStep(step, y0);
