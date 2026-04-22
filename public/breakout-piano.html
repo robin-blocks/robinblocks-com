@@ -173,11 +173,48 @@
   const silentEl = document.getElementById('silent-loop');
   if (silentEl) silentEl.volume = 0.001;
 
+  // ---- Piano soundfont (MusyngKite acoustic_grand_piano) ----
+  // Fetch per-pitch MP3 samples on first audio unlock and cache decoded
+  // AudioBuffers. playNote prefers the sample; falls back to the triangle
+  // oscillator if the sample hasn't arrived yet or the fetch fails.
+  const PIANO_URL = 'https://gleitz.github.io/midi-js-soundfonts/MusyngKite/acoustic_grand_piano-mp3/';
+  const SHARP_TO_FLAT = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
+  const pianoBuffers = {};         // noteName -> AudioBuffer | null (null = failed)
+  let pianoPreloadStarted = false;
+  const toSoundfontName = (note) => {
+    const m = note.match(/^([A-G]#?)(\d+)$/);
+    if (!m) return note;
+    const letter = m[1];
+    if (letter.length === 2) return (SHARP_TO_FLAT[letter] || letter) + m[2];
+    return note;
+  };
+  const loadPianoNote = async (note) => {
+    if (note in pianoBuffers) return;
+    try {
+      const res = await fetch(PIANO_URL + toSoundfontName(note) + '.mp3');
+      if (!res.ok) throw new Error('http ' + res.status);
+      const arr = await res.arrayBuffer();
+      const buf = await audio.decodeAudioData(arr);
+      pianoBuffers[note] = buf;
+    } catch (e) {
+      pianoBuffers[note] = null;
+    }
+  };
+  const preloadPianoSamples = () => {
+    if (pianoPreloadStarted) return;
+    pianoPreloadStarted = true;
+    const pitches = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    for (const o of [4, 5, 6]) {
+      for (const p of pitches) loadPianoNote(p + o);
+    }
+  };
+
   const initAudio = () => {
     if (!audio) {
       try {
         audio = new (window.AudioContext || window.webkitAudioContext)();
       } catch (e) { return; }
+      preloadPianoSamples();
     }
     if (audio.state === 'suspended') audio.resume().catch(() => {});
     try {
@@ -189,9 +226,29 @@
     } catch (e) {}
     if (silentEl && silentEl.paused) silentEl.play().catch(() => {});
   };
-  const playNote = (freq, gainScale = 1) => {
+
+  const playNote = (noteArg, gainScale = 1) => {
     if (!audio) return;
     const t = audio.currentTime;
+    let noteName = null, freq;
+    if (typeof noteArg === 'string') {
+      noteName = noteArg;
+      freq = noteFreq(noteArg);
+    } else {
+      freq = noteArg;
+    }
+    // Prefer piano sample when available
+    const pianoBuf = noteName ? pianoBuffers[noteName] : null;
+    if (pianoBuf) {
+      const src = audio.createBufferSource();
+      src.buffer = pianoBuf;
+      const gain = audio.createGain();
+      gain.gain.value = 0.75 * gainScale;
+      src.connect(gain).connect(audio.destination);
+      src.start(t);
+      return;
+    }
+    // Fallback: triangle oscillator with ADSR
     const osc = audio.createOscillator();
     const gain = audio.createGain();
     osc.type = 'triangle';
@@ -545,8 +602,8 @@
           lostDotAt = now;
           tokens.length = 0; // Clear any falling tokens with the rally
           // Descending tritone stinger
-          playNote(noteFreq('C5'));
-          setTimeout(() => { try { playNote(noteFreq('F#4')); } catch (e) {} }, 80);
+          playNote('C5');
+          setTimeout(() => { try { playNote('F#4'); } catch (e) {} }, 80);
         }
         continue;
       }
@@ -560,7 +617,7 @@
       if (best) {
         best.alive = false;
         best.flash = 1;
-        playNote(best.freq);
+        playNote(best.note);
         score += multiplier;
         multiplier = Math.min(MAX_MULT, multiplier + 1);
         if (multiplier > peakMultiplier) peakMultiplier = multiplier;
@@ -599,9 +656,9 @@
             chordFlashUntil = hitTime + 250;
             chordCooldownUntil = hitTime + CHORD_COOLDOWN_MS;
             const oct = 4;
-            playNote(pcToFreq(chord.root, oct), 0.4);
-            playNote(pcToFreq((chord.root + chord.third) % 12, oct), 0.4);
-            playNote(pcToFreq((chord.root + chord.fifth) % 12, oct), 0.4);
+            playNote(PC_NAMES[chord.root] + oct, 0.4);
+            playNote(PC_NAMES[(chord.root + chord.third) % 12] + oct, 0.4);
+            playNote(PC_NAMES[(chord.root + chord.fifth) % 12] + oct, 0.4);
             floatingTexts.push({
               text: `${chordLabel(chord)} +${bonus}`,
               x: ball.x,
@@ -641,7 +698,7 @@
           });
         }
         // Pleasant confirmation tone
-        playNote(noteFreq('C6'), 0.5);
+        playNote('C6', 0.5);
         floatingTexts.push({
           text: '+2 balls',
           x: paddle.x + paddle.w / 2,
@@ -691,7 +748,7 @@
       setTimeout(() => {
         if (myGen !== playbackGen) return; // cancelled by reset
         playbackIndex = idx;
-        playNote(entry.freq, 0.7);
+        playNote(entry.note, 0.7);
         floatingTexts.push({
           text: '♪ ' + entry.note,
           x: noteToX.get(entry.note) ?? W / 2,
@@ -828,7 +885,23 @@
     const lastEnd = (qPos[qPos.length - 1] || 0) + (noteDur[noteDur.length - 1] || 1);
     const totalBars = Math.max(1, Math.ceil(lastEnd / SEMIQ_PER_BAR));
     const totalLines = Math.max(1, Math.ceil(totalBars / BARS_PER_LINE));
-    const firstVisibleLine = Math.max(0, totalLines - VISIBLE_LINES);
+
+    // During playback, keep the active line at the bottom of the visible
+    // window so the score visually scrolls from top to bottom as the piece
+    // plays. Outside of playback, default to showing the latest lines.
+    const isPlayingBack = performance.now() < playbackUntil
+      && playbackIndex >= 0 && playbackIndex < composition.length;
+    let firstVisibleLine;
+    if (isPlayingBack) {
+      const activeBar = Math.floor(qPos[playbackIndex] / SEMIQ_PER_BAR);
+      const activeLine = Math.floor(activeBar / BARS_PER_LINE);
+      firstVisibleLine = Math.max(0, Math.min(
+        totalLines - VISIBLE_LINES,
+        activeLine - VISIBLE_LINES + 1
+      ));
+    } else {
+      firstVisibleLine = Math.max(0, totalLines - VISIBLE_LINES);
+    }
 
     const headW = SS * 1.25;
     const headH = SS * 0.9;
@@ -1121,13 +1194,6 @@
         const step = staffStep(n.note);
         const y = yForStep(step, y0);
         const isSharp = n.note.replace(/\d/g, '').length === 2;
-
-        ctx.strokeStyle = 'rgba(255, 215, 100, 0.7)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y0 - 6);
-        ctx.lineTo(x, y0 + staffH + 6);
-        ctx.stroke();
 
         ctx.fillStyle = 'rgba(255, 215, 100, 0.35)';
         ctx.beginPath();
