@@ -408,26 +408,54 @@
   };
 
   // ---- Input ----
+  let playButtonRect = null; // canvas-space rect for "Play composition" button
+  const toCanvas = (clientX, clientY) => {
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: (clientX - r.left) * (W / r.width),
+      y: (clientY - r.top) * (H / r.height),
+    };
+  };
   const aimPaddle = (clientX) => {
     const r = canvas.getBoundingClientRect();
     const mx = (clientX - r.left) * (W / r.width);
     paddle.x = Math.max(0, Math.min(W - paddle.w, mx - paddle.w / 2));
   };
-  const fireClick = () => {
+  const hitPlayButton = (cx, cy) => {
+    const b = playButtonRect;
+    return b && cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+  };
+  const fireClick = (cx, cy) => {
     initAudio();
-    if (gameOver || won) { resetGame(); return; }   // reset → docked, next tap launches
+    if (gameOver || won) {
+      if (hitPlayButton(cx, cy) && composition.length > 0) {
+        playComposition();
+        return;
+      }
+      resetGame();
+      return;
+    }
     if (balls.length === 0 && lives > 0) launchBall();
     // else: ball in flight, swallow the tap (audio already unlocked)
   };
 
   canvas.addEventListener('mousemove', (e) => aimPaddle(e.clientX));
-  canvas.addEventListener('click', fireClick);
+  canvas.addEventListener('click', (e) => {
+    const { x, y } = toCanvas(e.clientX, e.clientY);
+    fireClick(x, y);
+  });
 
   // Touch: drag to aim, tap to launch. preventDefault stops page scroll/zoom.
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (e.touches[0]) aimPaddle(e.touches[0].clientX);
-    fireClick();
+    const t = e.touches[0];
+    if (t) {
+      aimPaddle(t.clientX);
+      const { x, y } = toCanvas(t.clientX, t.clientY);
+      fireClick(x, y);
+    } else {
+      fireClick(-1, -1);
+    }
   }, { passive: false });
   canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
@@ -969,21 +997,50 @@
     }
 
     if (gameOver || won) {
-      const playingBack = won && now < playbackUntil;
+      const playingBack = now < playbackUntil;
+      const canPlayback = composition.length > 0 && !playingBack;
+
       // Slightly lighter overlay during playback so the note floats stay visible
       ctx.fillStyle = `rgba(0,0,0,${playingBack ? 0.4 : 0.6})`;
-      ctx.fillRect(0, H / 2 - 80, W, 160);
+      const panelH = canPlayback ? 196 : 160;
+      ctx.fillRect(0, H / 2 - panelH / 2, W, panelH);
       ctx.fillStyle = '#fff';
       ctx.font = '36px -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(won ? 'You cleared the keyboard!' : 'Game Over', W / 2, H / 2 - 32);
+      const titleY = H / 2 - (canPlayback ? 58 : 32);
+      ctx.fillText(won ? 'You cleared the keyboard!' : 'Game Over', W / 2, titleY);
       ctx.font = '18px -apple-system, sans-serif';
       ctx.fillStyle = '#e8d8cc';
-      ctx.fillText(`Score ${score}   ·   Peak combo ×${peakMultiplier}`, W / 2, H / 2);
-      ctx.font = '15px -apple-system, sans-serif';
-      ctx.fillStyle = '#bbb';
-      ctx.fillText(playingBack ? '♪ Playing your composition…' : 'tap to play again', W / 2, H / 2 + 32);
+      ctx.fillText(`Score ${score}   ·   Peak combo ×${peakMultiplier}`, W / 2, titleY + 32);
+
+      if (canPlayback) {
+        // "Play composition" pill
+        const btnW = 220, btnH = 34;
+        const btnX = W / 2 - btnW / 2;
+        const btnY = titleY + 58;
+        ctx.strokeStyle = 'rgba(255, 220, 120, 0.85)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(btnX, btnY, btnW, btnH, 17);
+        else ctx.rect(btnX, btnY, btnW, btnH);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 220, 120, 0.95)';
+        ctx.font = 'bold 14px -apple-system, sans-serif';
+        ctx.fillText('♪ Play composition', W / 2, btnY + btnH / 2 + 0.5);
+        playButtonRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+        ctx.font = '13px -apple-system, sans-serif';
+        ctx.fillStyle = '#999';
+        ctx.fillText('tap anywhere else to play again', W / 2, btnY + btnH + 18);
+      } else {
+        playButtonRect = null;
+        ctx.font = '15px -apple-system, sans-serif';
+        ctx.fillStyle = '#bbb';
+        ctx.fillText(playingBack ? '♪ Playing your composition…' : 'tap to play again', W / 2, titleY + 64);
+      }
+    } else {
+      playButtonRect = null;
     }
   };
 
