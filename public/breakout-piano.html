@@ -735,19 +735,27 @@
   const playComposition = () => {
     if (composition.length === 0) return;
     const PLAYBACK_DELAY = 900;   // pause before starting, lets the "win" moment land
-    const MIN_GAP = 60, MAX_GAP = 400;
     const myGen = ++playbackGen;
-    let scheduled = PLAYBACK_DELAY;
+
+    // Playback follows the same 4/4 quantization as the rendered staff:
+    // each note sounds at its sequential (bar*8 + pos) * 250ms time.
+    const { els } = buildScore();
+    const compIdxToSeqMs = new Map();
+    for (const e of els) {
+      if (e.type === 'note') {
+        compIdxToSeqMs.set(e.compIdx, (e.bar * QUAVERS_PER_BAR + e.pos) * QUAVER_MS);
+      }
+    }
+
+    let latest = 0;
     for (let i = 0; i < composition.length; i++) {
       const entry = composition[i];
-      if (i > 0) {
-        const rawGap = entry.time - composition[i - 1].time;
-        scheduled += Math.max(MIN_GAP, Math.min(MAX_GAP, rawGap));
-      }
-      const idx = i;
+      const seqMs = compIdxToSeqMs.get(i) ?? 0;
+      const when = PLAYBACK_DELAY + seqMs;
+      if (when > latest) latest = when;
       setTimeout(() => {
-        if (myGen !== playbackGen) return; // cancelled by reset
-        playbackIndex = idx;
+        if (myGen !== playbackGen) return;
+        playbackIndex = i;
         playNote(entry.note, 0.7);
         floatingTexts.push({
           text: '♪ ' + entry.note,
@@ -755,15 +763,13 @@
           y: KEYBOARD_TOP - 8,
           startTime: performance.now(),
         });
-      }, scheduled);
+      }, when);
     }
-    // After the last note's natural decay, clear the active index
     setTimeout(() => {
       if (myGen !== playbackGen) return;
       playbackIndex = -1;
-    }, scheduled + 1200);
-    // Tail buffer so "Playing…" overlay stays up until the last note fades
-    playbackUntil = performance.now() + scheduled + 1400;
+    }, latest + 1200);
+    playbackUntil = performance.now() + latest + 1400;
   };
 
   // ---- Draw ----
@@ -813,28 +819,59 @@
     return DIATONIC[letter] + (oct - 4) * 7 - 2; // relative to E4 at line 1
   };
 
-  // ---- Staff rendering with 4/4 quantization ----
-  // Each hit snaps to the nearest semiquaver slot (125ms at 120 BPM).
-  // A note's duration = gap to the next hit, floor-quantized into
-  // {1,2,3,4,6,8,12,16} semiquavers (dotted values included so gaps
-  // like 3 or 6 render as a single dotted note rather than note+rest).
-  // Any leftover silence inside a bar is then filled with rests so every
-  // bar sums to exactly 16 semiquavers.
-  const VALID_DURS = [16, 12, 8, 6, 4, 3, 2, 1];
-  const floorToValid = (n) => {
-    for (const v of VALID_DURS) if (v <= n) return v;
-    return 1;
-  };
-  const decomposeRest = (d) => {
-    const parts = [];
-    while (d > 0) {
-      const v = floorToValid(d);
-      parts.push(v);
-      d -= v;
+  // ---- Staff rendering (simple 4/4 — crotchets and quavers only) ----
+  // Build a flat list of {bar, pos, dur, type, compIdx?, note?} elements.
+  // pos is a quaver position (0..7) inside a bar. dur is 1 (quaver) or
+  // 2 (crotchet). Each bar always sums to exactly 8 quavers. A bar with
+  // no notes renders as a single centred whole-bar rest.
+  const BPM_FIXED = 120;
+  const QUAVER_MS = 60000 / BPM_FIXED / 2; // 250ms
+  const QUAVERS_PER_BAR = 8;
+
+  const buildScore = () => {
+    const els = [];
+    if (composition.length === 0) return { els, totalBars: 0 };
+    let bar = 0, pos = 0;
+    const advance = (d) => {
+      pos += d;
+      while (pos >= QUAVERS_PER_BAR) { bar += 1; pos -= QUAVERS_PER_BAR; }
+    };
+    for (let i = 0; i < composition.length; i++) {
+      const c = composition[i];
+      const rawGapMs = i < composition.length - 1
+        ? composition[i + 1].time - c.time
+        : QUAVER_MS * 2; // default last note = 1 crotchet
+      const rawGapQ = Math.max(1, Math.round(rawGapMs / QUAVER_MS));
+      let noteDur = rawGapQ <= 1 ? 1 : 2;
+      if (noteDur === 2 && pos + 2 > QUAVERS_PER_BAR) noteDur = 1; // downgrade to stay in bar
+      els.push({ bar, pos, dur: noteDur, type: 'note', compIdx: i, note: c.note });
+      advance(noteDur);
+      let restQ = rawGapQ - noteDur;
+      while (restQ > 0) {
+        const remInBar = QUAVERS_PER_BAR - pos;
+        const canCrotchet = restQ >= 2 && remInBar >= 2 && pos % 2 === 0;
+        const restDur = canCrotchet ? 2 : 1;
+        els.push({ bar, pos, dur: restDur, type: 'rest' });
+        advance(restDur);
+        restQ -= restDur;
+      }
     }
-    return parts;
+    // Complete the trailing bar with rests so every bar sums to 8 quavers.
+    while (pos > 0) {
+      const remInBar = QUAVERS_PER_BAR - pos;
+      const canCrotchet = remInBar >= 2 && pos % 2 === 0;
+      const restDur = canCrotchet ? 2 : 1;
+      els.push({ bar, pos, dur: restDur, type: 'rest' });
+      advance(restDur);
+    }
+    const totalBars = bar + (pos > 0 ? 1 : 0);
+    return { els, totalBars: Math.max(totalBars, 1) };
   };
-  const isDotted = (v) => v === 3 || v === 6 || v === 12;
+
+  // Convert our internal 1/2-quaver durations to the {1,2,4,8,16} semiquaver
+  // codes that drawNoteHead / drawRest expect (a quaver = 2 semiquavers,
+  // a crotchet = 4, a whole-bar rest = 16).
+  const toSemiqCode = (dur, isWholeBar) => isWholeBar ? 16 : (dur === 1 ? 2 : 4);
 
   const drawMusicStaff = () => {
     if (composition.length === 0) return;
@@ -848,53 +885,30 @@
     const padding = 20;
     const VISIBLE_LINES = 3;
 
-    const BPM = 120;
-    const SEMIQ_MS = 60000 / BPM / 4;
-    const SEMIQ_PER_BAR = 16;
-
     const maxLineW = W - padding * 2;
     const BARS_PER_LINE = maxLineW > 700 ? 4 : (maxLineW > 420 ? 3 : 2);
-    const LINE_SEMIQ = BARS_PER_LINE * SEMIQ_PER_BAR;
+    const LINE_QUAVERS = BARS_PER_LINE * QUAVERS_PER_BAR;
     const contentOffset = clefW + timeSigW;
-    const pxPerSemiq = (maxLineW - contentOffset) / LINE_SEMIQ;
-    const pxPerBar = SEMIQ_PER_BAR * pxPerSemiq;
+    const pxPerQuaver = (maxLineW - contentOffset) / LINE_QUAVERS;
+    const pxPerBar = QUAVERS_PER_BAR * pxPerQuaver;
     const staffW = maxLineW;
     const staffX = (W - staffW) / 2;
 
-    // Quantize positions
-    const qPos = new Array(composition.length);
-    for (let i = 0; i < composition.length; i++) {
-      qPos[i] = Math.max(0, Math.round(composition[i].time / SEMIQ_MS));
-    }
-    for (let i = 1; i < qPos.length; i++) {
-      if (qPos[i] <= qPos[i - 1]) qPos[i] = qPos[i - 1] + 1;
-    }
-
-    // Assign note duration: floor-quantize the gap to the next hit,
-    // capped to the remaining space in the current bar so notes never
-    // cross bar lines. Any shortfall becomes rests.
-    const noteDur = new Array(composition.length);
-    for (let i = 0; i < composition.length; i++) {
-      const raw = i < composition.length - 1
-        ? qPos[i + 1] - qPos[i]
-        : 16 - (qPos[i] % SEMIQ_PER_BAR);         // last note: fill to end of its bar
-      const inBar = SEMIQ_PER_BAR - (qPos[i] % SEMIQ_PER_BAR);
-      noteDur[i] = floorToValid(Math.max(1, Math.min(raw, inBar)));
-    }
-
-    const lastEnd = (qPos[qPos.length - 1] || 0) + (noteDur[noteDur.length - 1] || 1);
-    const totalBars = Math.max(1, Math.ceil(lastEnd / SEMIQ_PER_BAR));
+    const { els, totalBars } = buildScore();
     const totalLines = Math.max(1, Math.ceil(totalBars / BARS_PER_LINE));
 
-    // During playback, keep the active line at the bottom of the visible
-    // window so the score visually scrolls from top to bottom as the piece
-    // plays. Outside of playback, default to showing the latest lines.
+    // Quick lookup: composition index → element (for playback highlight)
+    const elByCompIdx = new Map();
+    for (const e of els) if (e.type === 'note') elByCompIdx.set(e.compIdx, e);
+
+    // During playback, scroll so the active line sits at the bottom of the
+    // visible window. Outside playback, show the latest lines.
     const isPlayingBack = performance.now() < playbackUntil
       && playbackIndex >= 0 && playbackIndex < composition.length;
     let firstVisibleLine;
     if (isPlayingBack) {
-      const activeBar = Math.floor(qPos[playbackIndex] / SEMIQ_PER_BAR);
-      const activeLine = Math.floor(activeBar / BARS_PER_LINE);
+      const activeEl = elByCompIdx.get(playbackIndex);
+      const activeLine = activeEl ? Math.floor(activeEl.bar / BARS_PER_LINE) : totalLines - 1;
       firstVisibleLine = Math.max(0, Math.min(
         totalLines - VISIBLE_LINES,
         activeLine - VISIBLE_LINES + 1
@@ -906,19 +920,15 @@
     const headW = SS * 1.25;
     const headH = SS * 0.9;
     const stemLen = SS * 3.0;
-
-    // ---------- shared helpers ----------
     const yForStep = (step, y0) => y0 + (8 - step) * (SS / 2);
 
-    const drawNoteHead = (x, y, step, isSharp, dur, ink, scale = 1) => {
+    // ---------- helpers ----------
+    const drawNoteHead = (x, y, step, isSharp, semiqCode, ink, scale = 1) => {
       // Ledger lines
       if (step <= -2) {
         ctx.strokeStyle = ink;
         ctx.lineWidth = 1;
-        const ly = yForStep(-2, yForStep(0, 0));
-        // recompute relative to y using step offset
-        const delta = (0 - step) * (SS / 2);
-        const ly2 = y + delta;
+        const ly2 = y + (0 - step) * (SS / 2);
         ctx.beginPath();
         ctx.moveTo(x - headW * 0.8, ly2);
         ctx.lineTo(x + headW * 0.8, ly2);
@@ -927,14 +937,12 @@
       if (step >= 10) {
         ctx.strokeStyle = ink;
         ctx.lineWidth = 1;
-        const delta = (10 - step) * (SS / 2);
-        const ly2 = y + delta;
+        const ly2 = y + (10 - step) * (SS / 2);
         ctx.beginPath();
         ctx.moveTo(x - headW * 0.8, ly2);
         ctx.lineTo(x + headW * 0.8, ly2);
         ctx.stroke();
       }
-      // Sharp accidental
       if (isSharp) {
         ctx.fillStyle = ink;
         ctx.font = `${SS * 1.8}px serif`;
@@ -942,69 +950,49 @@
         ctx.textBaseline = 'middle';
         ctx.fillText('♯', x - headW - 2, y);
       }
-      // Head
-      const filled = dur <= 4;
+      // Head — filled for crotchet/quaver, open for semibreve (centred whole-bar notes only)
+      const filled = semiqCode <= 4;
       ctx.fillStyle = ink;
       ctx.strokeStyle = ink;
       ctx.lineWidth = 1.1;
       ctx.beginPath();
       ctx.ellipse(x, y, (headW / 2) * scale, (headH / 2) * scale, -0.3, 0, Math.PI * 2);
       if (filled) ctx.fill(); else ctx.stroke();
-
-      // Stem + flags (skip for semibreve)
-      if (dur < 16) {
-        const stemUp = step <= 4;
-        const stemX = stemUp ? x + headW / 2 - 0.5 : x - headW / 2 + 0.5;
-        const stemTipY = stemUp ? y - stemLen : y + stemLen;
+      if (semiqCode === 16) return; // semibreve: no stem, no flags
+      // Stem
+      const stemUp = step <= 4;
+      const stemX = stemUp ? x + headW / 2 - 0.5 : x - headW / 2 + 0.5;
+      const stemTipY = stemUp ? y - stemLen : y + stemLen;
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(stemX, y);
+      ctx.lineTo(stemX, stemTipY);
+      ctx.stroke();
+      // Single flag for quaver, none for crotchet
+      if (semiqCode === 2) {
+        const flagLen = SS * 1.4;
+        const flagDrop = SS * 1.4;
         ctx.strokeStyle = ink;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.moveTo(stemX, y);
-        ctx.lineTo(stemX, stemTipY);
+        ctx.moveTo(stemX, stemTipY);
+        ctx.lineTo(stemX + flagLen, stemTipY + (stemUp ? flagDrop : -flagDrop));
         ctx.stroke();
-
-        // Flags: 1 for quaver, 2 for semiquaver (skip for dotted — rare and messy)
-        const flagCount = dur === 1 ? 2 : (dur === 2 ? 1 : 0);
-        if (flagCount > 0) {
-          const flagLen = SS * 1.4;
-          const flagDrop = SS * 1.4;
-          ctx.strokeStyle = ink;
-          ctx.lineWidth = 1.6;
-          for (let f = 0; f < flagCount; f++) {
-            const baseY = stemTipY + f * (stemUp ? SS * 0.7 : -SS * 0.7);
-            ctx.beginPath();
-            ctx.moveTo(stemX, baseY);
-            ctx.lineTo(stemX + flagLen, baseY + (stemUp ? flagDrop : -flagDrop));
-            ctx.stroke();
-          }
-        }
-      }
-
-      // Augmentation dot for dotted durations
-      if (isDotted(dur)) {
-        ctx.fillStyle = ink;
-        ctx.beginPath();
-        ctx.arc(x + headW * 0.9, y + SS * 0.25, SS * 0.22, 0, Math.PI * 2);
-        ctx.fill();
       }
     };
 
-    // Draw a rest symbol centered at x, with staff top at y0
-    const drawRest = (x, y0, dur, ink) => {
+    const drawRest = (x, y0, semiqCode, ink) => {
       ctx.fillStyle = ink;
       ctx.strokeStyle = ink;
-      const midY = y0 + 2 * SS;                 // middle line (line 3)
-      const line2Y = y0 + SS;                   // second-from-top line
-      if (dur === 16 || dur === 12) {
-        // Whole rest hangs from line 2 (second from top)
+      const midY = y0 + 2 * SS;
+      const line2Y = y0 + SS;
+      if (semiqCode === 16) {
+        // Whole-bar rest: rectangle hanging from line 2
         const rw = SS * 1.4, rh = SS * 0.55;
         ctx.fillRect(x - rw / 2, line2Y - rh, rw, rh);
-      } else if (dur === 8 || dur === 6) {
-        // Half rest sits on line 3 (middle)
-        const rw = SS * 1.4, rh = SS * 0.55;
-        ctx.fillRect(x - rw / 2, midY - rh, rw, rh);
-      } else if (dur === 4 || dur === 3) {
-        // Quarter rest: stylized "Z" wrapping the middle
+      } else if (semiqCode === 4) {
+        // Crotchet rest: stylised "Z"
         ctx.lineWidth = 1.6;
         ctx.beginPath();
         ctx.moveTo(x - SS * 0.6, y0 + SS * 0.6);
@@ -1014,8 +1002,8 @@
         ctx.beginPath();
         ctx.arc(x + SS * 0.2, y0 + SS * 3.4, SS * 0.25, 0, Math.PI * 2);
         ctx.fill();
-      } else if (dur === 2) {
-        // Eighth rest: single flag with a filled dot
+      } else if (semiqCode === 2) {
+        // Quaver rest: flag with filled dot
         ctx.lineWidth = 1.3;
         ctx.beginPath();
         ctx.moveTo(x + SS * 0.4, y0 + SS * 0.8);
@@ -1023,26 +1011,6 @@
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(x + SS * 0.4, y0 + SS * 0.8, SS * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (dur === 1) {
-        // Sixteenth rest: two flags + dot
-        ctx.lineWidth = 1.3;
-        ctx.beginPath();
-        ctx.moveTo(x + SS * 0.5, y0 + SS * 0.5);
-        ctx.lineTo(x - SS * 0.3, y0 + SS * 3.4);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(x + SS * 0.5, y0 + SS * 0.5, SS * 0.28, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x + SS * 0.25, y0 + SS * 1.4, SS * 0.28, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Dot for dotted rest
-      if (isDotted(dur)) {
-        ctx.fillStyle = ink;
-        ctx.beginPath();
-        ctx.arc(x + SS * 1.2, midY, SS * 0.22, 0, Math.PI * 2);
         ctx.fill();
       }
     };
@@ -1096,112 +1064,58 @@
         ctx.stroke();
       }
 
-      // Walk each bar on this line, fill with notes + rests summing to 16
       const lineStartBar = lineIdx * BARS_PER_LINE;
       for (let b = 0; b < BARS_PER_LINE; b++) {
         const barIdx = lineStartBar + b;
         if (barIdx >= totalBars) break;
         const barX = contentStart + b * pxPerBar;
-        const barSemiqStart = barIdx * SEMIQ_PER_BAR;
 
-        // Collect note indices that start in this bar
-        const notesInBar = [];
-        for (let i = 0; i < composition.length; i++) {
-          if (qPos[i] >= barSemiqStart && qPos[i] < barSemiqStart + SEMIQ_PER_BAR) {
-            notesInBar.push(i);
-          }
-        }
-
-        // Whole-bar rest: bar has no notes at all → center a whole rest
-        if (notesInBar.length === 0) {
+        // Elements in this bar
+        const barEls = els.filter((e) => e.bar === barIdx);
+        const hasNotes = barEls.some((e) => e.type === 'note');
+        if (!hasNotes) {
+          // Whole-bar rest, centred
           drawRest(barX + pxPerBar / 2, y0, 16, ink);
           continue;
         }
-
-        // If the single note fills the bar exactly, center it
-        if (notesInBar.length === 1 && noteDur[notesInBar[0]] === 16
-            && (qPos[notesInBar[0]] - barSemiqStart) === 0) {
-          const i = notesInBar[0];
-          const n = composition[i];
-          const step = staffStep(n.note);
-          const isSharp = n.note.replace(/\d/g, '').length === 2;
-          const x = barX + pxPerBar / 2;
-          const y = yForStep(step, y0);
-          drawNoteHead(x, y, step, isSharp, 16, ink);
-          continue;
-        }
-
-        // General walker: slot 0..15, render notes where they start, fill the rest
-        let slot = 0;
-        let noteCursor = 0;
-        while (slot < SEMIQ_PER_BAR) {
-          const nextNoteIdx = notesInBar[noteCursor];
-          const nextSlot = nextNoteIdx !== undefined
-            ? qPos[nextNoteIdx] - barSemiqStart
-            : SEMIQ_PER_BAR;
-
-          if (slot < nextSlot) {
-            // Silent span → rest(s)
-            const restLen = nextSlot - slot;
-            let rem = restLen;
-            let cursor = slot;
-            while (rem > 0) {
-              const v = floorToValid(rem);
-              const rx = barX + (cursor + v / 2) * pxPerSemiq;
-              drawRest(rx, y0, v, ink);
-              cursor += v;
-              rem -= v;
-            }
-            slot = nextSlot;
+        for (const e of barEls) {
+          const x = barX + e.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
+          if (e.type === 'note') {
+            const step = staffStep(e.note);
+            const isSharp = e.note.replace(/\d/g, '').length === 2;
+            drawNoteHead(x, yForStep(step, y0), step, isSharp, toSemiqCode(e.dur, false), ink);
           } else {
-            // Render note at this slot
-            const i = nextNoteIdx;
-            const n = composition[i];
-            const step = staffStep(n.note);
-            const isSharp = n.note.replace(/\d/g, '').length === 2;
-            const dur = noteDur[i];
-            const x = barX + slot * pxPerSemiq + Math.min(pxPerSemiq * 0.4, 4);
-            const y = yForStep(step, y0);
-            drawNoteHead(x, y, step, isSharp, dur, ink);
-            slot += dur;
-            noteCursor += 1;
+            drawRest(x, y0, toSemiqCode(e.dur, false), ink);
           }
         }
       }
     }
 
-    // Playhead + active-note highlight (quantized x)
+    // Active-note highlight (no playhead line)
     const now = performance.now();
     if (now < playbackUntil && playbackIndex >= 0 && playbackIndex < composition.length) {
-      const activeBarIdx = Math.floor(qPos[playbackIndex] / SEMIQ_PER_BAR);
-      const activeLineIdx = Math.floor(activeBarIdx / BARS_PER_LINE);
-      if (activeLineIdx >= firstVisibleLine && activeLineIdx < firstVisibleLine + VISIBLE_LINES) {
-        const L = activeLineIdx - firstVisibleLine;
-        const y0 = staffTop + L * linePitch;
-        const contentStart = staffX + contentOffset;
-        const barWithinLine = activeBarIdx - activeLineIdx * BARS_PER_LINE;
-        const barX = contentStart + barWithinLine * pxPerBar;
-        const slotInBar = qPos[playbackIndex] - activeBarIdx * SEMIQ_PER_BAR;
-        // Match the special-case centering used for pure semibreve bars
-        const dur = noteDur[playbackIndex];
-        let x;
-        if (dur === 16 && slotInBar === 0) {
-          x = barX + pxPerBar / 2;
-        } else {
-          x = barX + slotInBar * pxPerSemiq + Math.min(pxPerSemiq * 0.4, 4);
+      const activeEl = elByCompIdx.get(playbackIndex);
+      if (activeEl) {
+        const activeLineIdx = Math.floor(activeEl.bar / BARS_PER_LINE);
+        if (activeLineIdx >= firstVisibleLine && activeLineIdx < firstVisibleLine + VISIBLE_LINES) {
+          const L = activeLineIdx - firstVisibleLine;
+          const y0 = staffTop + L * linePitch;
+          const contentStart = staffX + contentOffset;
+          const barWithinLine = activeEl.bar - activeLineIdx * BARS_PER_LINE;
+          const barX = contentStart + barWithinLine * pxPerBar;
+          const x = barX + activeEl.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
+          const n = composition[playbackIndex];
+          const step = staffStep(n.note);
+          const y = yForStep(step, y0);
+          const isSharp = n.note.replace(/\d/g, '').length === 2;
+
+          ctx.fillStyle = 'rgba(255, 215, 100, 0.35)';
+          ctx.beginPath();
+          ctx.arc(x, y, headW * 1.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          drawNoteHead(x, y, step, isSharp, toSemiqCode(activeEl.dur, false), 'rgba(255, 215, 100, 1)', 1.3);
         }
-        const n = composition[playbackIndex];
-        const step = staffStep(n.note);
-        const y = yForStep(step, y0);
-        const isSharp = n.note.replace(/\d/g, '').length === 2;
-
-        ctx.fillStyle = 'rgba(255, 215, 100, 0.35)';
-        ctx.beginPath();
-        ctx.arc(x, y, headW * 1.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        const hinkInk = 'rgba(255, 215, 100, 1)';
-        drawNoteHead(x, y, step, isSharp, dur, hinkInk, 1.3);
       }
     }
 
