@@ -692,6 +692,115 @@
     ctx.stroke();
   };
 
+  // Staff step: diatonic offset from E4 (bottom line of treble clef). On-staff
+  // notes run steps 0 (E4) through 8 (F5); below/above need ledger lines.
+  const DIATONIC = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+  const staffStep = (note) => {
+    const letter = note[0];
+    const oct = parseInt(note.match(/\d/)[0], 10);
+    return DIATONIC[letter] + (oct - 4) * 7 - 2; // relative to E4 at line 1
+  };
+
+  const drawMusicStaff = () => {
+    if (composition.length === 0) return;
+    const MAX_NOTES = 16;
+    const visible = composition.slice(-MAX_NOTES);
+    const SS = 7;                              // inter-line spacing (px)
+    const staffH = SS * 4;                     // 5 lines, 4 gaps
+    const staffTop = 58;
+    const marginL = 30;
+    const clefW = 24;
+    const usableW = W - marginL * 2 - clefW;
+    const noteSpacing = Math.max(18, Math.min(34, usableW / MAX_NOTES));
+    const staffW = clefW + MAX_NOTES * noteSpacing;
+    const yForStep = (step) => staffTop + (8 - step) * (SS / 2);
+
+    ctx.save();
+
+    // Five staff lines
+    ctx.strokeStyle = 'rgba(255, 220, 200, 0.32)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const y = staffTop + i * SS;
+      ctx.beginPath();
+      ctx.moveTo(marginL, y);
+      ctx.lineTo(marginL + staffW, y);
+      ctx.stroke();
+    }
+
+    // Treble clef glyph
+    ctx.fillStyle = 'rgba(255, 220, 200, 0.55)';
+    ctx.font = `${staffH * 1.5}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('𝄞', marginL + clefW / 2, staffTop + staffH / 2 + SS * 0.3);
+
+    // Notes
+    const headW = SS * 1.25;
+    const headH = SS * 0.9;
+    const stemLen = SS * 3.2;
+    for (let i = 0; i < visible.length; i++) {
+      const n = visible[i];
+      const noteName = n.note.replace(/\d/g, '');
+      const isSharp = noteName.length === 2; // e.g. 'C#'
+      const step = staffStep(n.note);
+      const x = marginL + clefW + i * noteSpacing + noteSpacing / 2;
+      const y = yForStep(step);
+      // Fade oldest two notes so scroll-off feels softer
+      const alpha = i < 2 ? 0.4 + i * 0.2 : 0.85;
+      const ink = `rgba(255, 220, 200, ${alpha})`;
+
+      // Ledger line if outside staff
+      if (step <= -2) {
+        ctx.strokeStyle = ink;
+        const ly = yForStep(-2);
+        ctx.beginPath();
+        ctx.moveTo(x - headW, ly);
+        ctx.lineTo(x + headW, ly);
+        ctx.stroke();
+      }
+      if (step >= 10) {
+        ctx.strokeStyle = ink;
+        const ly = yForStep(10);
+        ctx.beginPath();
+        ctx.moveTo(x - headW, ly);
+        ctx.lineTo(x + headW, ly);
+        ctx.stroke();
+      }
+
+      // Sharp accidental
+      if (isSharp) {
+        ctx.fillStyle = ink;
+        ctx.font = `${SS * 1.8}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('♯', x - headW - 3, y);
+      }
+
+      // Note head (filled oval, slightly tilted)
+      ctx.fillStyle = ink;
+      ctx.beginPath();
+      ctx.ellipse(x, y, headW / 2, headH / 2, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Stem — down for notes above middle line (step > 4), up otherwise
+      const stemUp = step <= 4;
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      if (stemUp) {
+        ctx.moveTo(x + headW / 2 - 0.5, y);
+        ctx.lineTo(x + headW / 2 - 0.5, y - stemLen);
+      } else {
+        ctx.moveTo(x - headW / 2 + 0.5, y);
+        ctx.lineTo(x - headW / 2 + 0.5, y + stemLen);
+      }
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  };
+
   const draw = () => {
     const now = performance.now();
     ctx.clearRect(0, 0, W, H);
@@ -724,6 +833,9 @@
       ctx.font = `bold ${chipSize}px -apple-system, system-ui, sans-serif`;
       ctx.fillText('×' + multiplier, W / 2, fieldMid + watermarkSize * 0.5 + scoreSize * 0.7);
     }
+
+    // Musical staff (background) — paddle/balls/blocks render on top
+    drawMusicStaff();
 
     // Paddle
     ctx.fillStyle = '#e8e8e8';
