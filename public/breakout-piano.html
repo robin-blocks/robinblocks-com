@@ -428,6 +428,7 @@
   // Musical composition — every destroyed key is recorded; on win the
   // whole sequence plays back with gaps clamped into a musical range.
   const composition = []; // { note, freq, time } — time = ms since first hit
+  const lifeLossAfter = []; // composition indices after which a crotchet rest belongs
   let compositionStart = 0;
   let playbackGen = 0;   // increment to cancel any in-flight playback timeouts
   let playbackUntil = 0; // timestamp when playback ends (0 = not playing)
@@ -460,6 +461,7 @@
     floatingTexts.length = 0;
     tokens.length = 0;
     composition.length = 0;
+    lifeLossAfter.length = 0;
     compositionStart = 0;
     playbackGen++; // cancels any pending playback timeouts
     playbackUntil = 0;
@@ -601,6 +603,8 @@
           flashUntil = now + 150;
           lostDotAt = now;
           tokens.length = 0; // Clear any falling tokens with the rally
+          // Life-loss rest: drop a crotchet rest after the last played note.
+          if (composition.length > 0) lifeLossAfter.push(composition.length - 1);
           // Descending tritone stinger
           playNote('C5');
           setTimeout(() => { try { playNote('F#4'); } catch (e) {} }, 80);
@@ -836,33 +840,28 @@
       pos += d;
       while (pos >= QUAVERS_PER_BAR) { bar += 1; pos -= QUAVERS_PER_BAR; }
     };
+    // How many life-loss crotchet rests should be inserted after each note.
+    const restsAfter = new Map();
+    for (const idx of lifeLossAfter) {
+      restsAfter.set(idx, (restsAfter.get(idx) || 0) + 1);
+    }
+    const placeCrotchetRest = () => {
+      const dur = pos + 2 > QUAVERS_PER_BAR ? 1 : 2; // downgrade at bar edge
+      els.push({ type: 'rest', bar, pos, dur });
+      advance(dur);
+    };
     for (let i = 0; i < composition.length; i++) {
       const c = composition[i];
       const rawGapMs = i < composition.length - 1
         ? composition[i + 1].time - c.time
         : QUAVER_MS * 2; // default last note = 1 crotchet
-      const rawGapQ = Math.max(1, Math.round(rawGapMs / QUAVER_MS));
+      const rawGapQ = rawGapMs / QUAVER_MS;
       let noteDur = rawGapQ <= 1 ? 1 : 2;
-      if (noteDur === 2 && pos + 2 > QUAVERS_PER_BAR) noteDur = 1; // downgrade to stay in bar
-      els.push({ bar, pos, dur: noteDur, type: 'note', compIdx: i, note: c.note });
+      if (noteDur === 2 && pos + 2 > QUAVERS_PER_BAR) noteDur = 1; // downgrade at bar edge
+      els.push({ type: 'note', bar, pos, dur: noteDur, compIdx: i, note: c.note });
       advance(noteDur);
-      let restQ = rawGapQ - noteDur;
-      while (restQ > 0) {
-        const remInBar = QUAVERS_PER_BAR - pos;
-        const canCrotchet = restQ >= 2 && remInBar >= 2 && pos % 2 === 0;
-        const restDur = canCrotchet ? 2 : 1;
-        els.push({ bar, pos, dur: restDur, type: 'rest' });
-        advance(restDur);
-        restQ -= restDur;
-      }
-    }
-    // Complete the trailing bar with rests so every bar sums to 8 quavers.
-    while (pos > 0) {
-      const remInBar = QUAVERS_PER_BAR - pos;
-      const canCrotchet = remInBar >= 2 && pos % 2 === 0;
-      const restDur = canCrotchet ? 2 : 1;
-      els.push({ bar, pos, dur: restDur, type: 'rest' });
-      advance(restDur);
+      const lossCount = restsAfter.get(i) || 0;
+      for (let r = 0; r < lossCount; r++) placeCrotchetRest();
     }
     const totalBars = bar + (pos > 0 ? 1 : 0);
     return { els, totalBars: Math.max(totalBars, 1) };
@@ -923,7 +922,7 @@
     const yForStep = (step, y0) => y0 + (8 - step) * (SS / 2);
 
     // ---------- helpers ----------
-    const drawNoteHead = (x, y, step, isSharp, semiqCode, ink, scale = 1) => {
+    const drawNoteHead = (x, y, step, isSharp, semiqCode, ink, scale = 1, stemOverride = null, skipFlag = false) => {
       // Ledger lines
       if (step <= -2) {
         ctx.strokeStyle = ink;
@@ -959,8 +958,8 @@
       ctx.ellipse(x, y, (headW / 2) * scale, (headH / 2) * scale, -0.3, 0, Math.PI * 2);
       if (filled) ctx.fill(); else ctx.stroke();
       if (semiqCode === 16) return; // semibreve: no stem, no flags
-      // Stem
-      const stemUp = step <= 4;
+      // Stem (direction may be forced to match beam-group partner)
+      const stemUp = stemOverride !== null ? stemOverride : step <= 4;
       const stemX = stemUp ? x + headW / 2 - 0.5 : x - headW / 2 + 0.5;
       const stemTipY = stemUp ? y - stemLen : y + stemLen;
       ctx.strokeStyle = ink;
@@ -969,8 +968,8 @@
       ctx.moveTo(stemX, y);
       ctx.lineTo(stemX, stemTipY);
       ctx.stroke();
-      // Single flag for quaver, none for crotchet
-      if (semiqCode === 2) {
+      // Single flag for quaver, none for crotchet — suppressed for beamed quavers
+      if (semiqCode === 2 && !skipFlag) {
         const flagLen = SS * 1.4;
         const flagDrop = SS * 1.4;
         ctx.strokeStyle = ink;
@@ -1069,24 +1068,62 @@
         const barIdx = lineStartBar + b;
         if (barIdx >= totalBars) break;
         const barX = contentStart + b * pxPerBar;
-
-        // Elements in this bar
         const barEls = els.filter((e) => e.bar === barIdx);
-        const hasNotes = barEls.some((e) => e.type === 'note');
-        if (!hasNotes) {
-          // Whole-bar rest, centred
-          drawRest(barX + pxPerBar / 2, y0, 16, ink);
-          continue;
+
+        // Beam detection: per 4/4 beat (pos pairs 0-1, 2-3, 4-5, 6-7),
+        // a pair of adjacent quaver notes beams together.
+        const beamPairs = [];
+        const beamedSet = new Set();
+        const stemDirMap = new Map();  // element → forced stem direction (bool up)
+        for (let beat = 0; beat < 4; beat++) {
+          const p1 = beat * 2;
+          const p2 = p1 + 1;
+          const e1 = barEls.find((e) => e.pos === p1 && e.type === 'note' && e.dur === 1);
+          const e2 = barEls.find((e) => e.pos === p2 && e.type === 'note' && e.dur === 1);
+          if (e1 && e2) {
+            // Force both stems same direction based on average pitch
+            const avg = (staffStep(e1.note) + staffStep(e2.note)) / 2;
+            const up = avg <= 4;
+            beamPairs.push({ e1, e2, up });
+            beamedSet.add(e1);
+            beamedSet.add(e2);
+            stemDirMap.set(e1, up);
+            stemDirMap.set(e2, up);
+          }
         }
+
+        // Draw notes + rests
         for (const e of barEls) {
           const x = barX + e.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
           if (e.type === 'note') {
             const step = staffStep(e.note);
             const isSharp = e.note.replace(/\d/g, '').length === 2;
-            drawNoteHead(x, yForStep(step, y0), step, isSharp, toSemiqCode(e.dur, false), ink);
+            const stemDir = stemDirMap.has(e) ? stemDirMap.get(e) : null;
+            drawNoteHead(
+              x, yForStep(step, y0), step, isSharp,
+              toSemiqCode(e.dur, false), ink, 1, stemDir, beamedSet.has(e)
+            );
           } else {
             drawRest(x, y0, toSemiqCode(e.dur, false), ink);
           }
+        }
+
+        // Draw beams on top of stems
+        for (const { e1, e2, up } of beamPairs) {
+          const x1 = barX + e1.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
+          const x2 = barX + e2.pos * pxPerQuaver + Math.min(pxPerQuaver * 0.35, 5);
+          const y1 = yForStep(staffStep(e1.note), y0);
+          const y2 = yForStep(staffStep(e2.note), y0);
+          const tip1 = up ? y1 - stemLen : y1 + stemLen;
+          const tip2 = up ? y2 - stemLen : y2 + stemLen;
+          const stemX1 = up ? x1 + headW / 2 - 0.5 : x1 - headW / 2 + 0.5;
+          const stemX2 = up ? x2 + headW / 2 - 0.5 : x2 - headW / 2 + 0.5;
+          ctx.strokeStyle = ink;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(stemX1, tip1);
+          ctx.lineTo(stemX2, tip2);
+          ctx.stroke();
         }
       }
     }
