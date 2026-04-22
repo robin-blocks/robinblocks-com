@@ -441,7 +441,14 @@
     // else: ball in flight, swallow the tap (audio already unlocked)
   };
 
-  canvas.addEventListener('mousemove', (e) => aimPaddle(e.clientX));
+  let lastMouseX = -1, lastMouseY = -1;
+  canvas.addEventListener('mousemove', (e) => {
+    const c = toCanvas(e.clientX, e.clientY);
+    lastMouseX = c.x;
+    lastMouseY = c.y;
+    if (!(gameOver || won)) aimPaddle(e.clientX);
+  });
+  canvas.addEventListener('mouseleave', () => { lastMouseX = -1; lastMouseY = -1; });
   canvas.addEventListener('click', (e) => {
     const { x, y } = toCanvas(e.clientX, e.clientY);
     fireClick(x, y);
@@ -1110,7 +1117,14 @@
     }
   };
 
-  const loop = () => { update(); draw(); requestAnimationFrame(loop); };
+  const syncCursor = () => {
+    const overlayActive = gameOver || won;
+    const target = !overlayActive
+      ? 'none'
+      : (playButtonRect && hitPlayButton(lastMouseX, lastMouseY) ? 'pointer' : 'default');
+    if (canvas.style.cursor !== target) canvas.style.cursor = target;
+  };
+  const loop = () => { update(); draw(); syncCursor(); requestAnimationFrame(loop); };
 
   buildBlocks();
   loop();
