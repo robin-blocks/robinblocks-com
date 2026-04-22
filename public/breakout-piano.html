@@ -471,6 +471,17 @@
     if (e.touches[0]) aimPaddle(e.touches[0].clientX);
   }, { passive: false });
 
+  // P key: play composition from the game-over or win overlay.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'p' && e.key !== 'P') return;
+    if (!(gameOver || won)) return;
+    if (composition.length === 0) return;
+    if (performance.now() < playbackUntil) return; // already playing
+    e.preventDefault();
+    initAudio();
+    playComposition();
+  });
+
   // ---- Collision ----
   const overlapArea = (ball, b) => {
     const dx = Math.min(ball.x + ball.r, b.x + b.w) - Math.max(ball.x - ball.r, b.x);
@@ -1100,12 +1111,12 @@
         ctx.stroke();
         ctx.fillStyle = 'rgba(255, 220, 120, 0.95)';
         ctx.font = 'bold 14px -apple-system, sans-serif';
-        ctx.fillText('♪ Play composition', W / 2, btnY + btnH / 2 + 0.5);
+        ctx.fillText('♪ Play composition  ·  press P', W / 2, btnY + btnH / 2 + 0.5);
         playButtonRect = { x: btnX, y: btnY, w: btnW, h: btnH };
 
         ctx.font = '13px -apple-system, sans-serif';
         ctx.fillStyle = '#999';
-        ctx.fillText('tap anywhere else to play again', W / 2, btnY + btnH + 18);
+        ctx.fillText('tap / click anywhere else to play again', W / 2, btnY + btnH + 18);
       } else {
         playButtonRect = null;
         ctx.font = '15px -apple-system, sans-serif';
