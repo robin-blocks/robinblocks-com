@@ -703,99 +703,117 @@
 
   const drawMusicStaff = () => {
     if (composition.length === 0) return;
-    const MAX_NOTES = 16;
-    const visible = composition.slice(-MAX_NOTES);
-    const SS = 7;                              // inter-line spacing (px)
-    const staffH = SS * 4;                     // 5 lines, 4 gaps
-    const staffTop = 58;
-    const marginL = 30;
+    const SS = 6;                              // inter-line spacing (px)
+    const staffH = SS * 4;                     // 5 lines, 4 gaps (24px)
+    const lineGap = 14;                        // vertical gap between staff rows
+    const linePitch = staffH + lineGap;        // 38px per staff row
+    const staffTop = 52;
     const clefW = 24;
-    const usableW = W - marginL * 2 - clefW;
-    const noteSpacing = Math.max(18, Math.min(34, usableW / MAX_NOTES));
-    const staffW = clefW + MAX_NOTES * noteSpacing;
-    const yForStep = (step) => staffTop + (8 - step) * (SS / 2);
+    const padding = 20;
+    const TARGET_SPACING = 26;
+    const VISIBLE_LINES = 3;
+
+    const maxLineW = W - padding * 2;
+    const NOTES_PER_LINE = Math.max(8, Math.min(20, Math.floor((maxLineW - clefW) / TARGET_SPACING)));
+    const noteSpacing = TARGET_SPACING;
+    const staffW = clefW + NOTES_PER_LINE * noteSpacing;
+    const staffX = (W - staffW) / 2;           // center horizontally
+
+    const totalLines = Math.ceil(composition.length / NOTES_PER_LINE);
+    const firstVisibleLine = Math.max(0, totalLines - VISIBLE_LINES);
+
+    const headW = SS * 1.25;
+    const headH = SS * 0.9;
+    const stemLen = SS * 3.0;
 
     ctx.save();
 
-    // Five staff lines
-    ctx.strokeStyle = 'rgba(255, 220, 200, 0.32)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 5; i++) {
-      const y = staffTop + i * SS;
-      ctx.beginPath();
-      ctx.moveTo(marginL, y);
-      ctx.lineTo(marginL + staffW, y);
-      ctx.stroke();
-    }
+    for (let L = 0; L < VISIBLE_LINES && (firstVisibleLine + L) < totalLines; L++) {
+      const lineIdx = firstVisibleLine + L;
+      const y0 = staffTop + L * linePitch;
+      const sliceStart = lineIdx * NOTES_PER_LINE;
+      const sliceEnd = Math.min(sliceStart + NOTES_PER_LINE, composition.length);
+      // Fade the topmost row slightly once older content has scrolled out
+      const isFading = firstVisibleLine > 0 && L === 0;
+      const dim = isFading ? 0.5 : 1.0;
+      const yForStep = (step) => y0 + (8 - step) * (SS / 2);
 
-    // Treble clef glyph
-    ctx.fillStyle = 'rgba(255, 220, 200, 0.55)';
-    ctx.font = `${staffH * 1.5}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('𝄞', marginL + clefW / 2, staffTop + staffH / 2 + SS * 0.3);
-
-    // Notes
-    const headW = SS * 1.25;
-    const headH = SS * 0.9;
-    const stemLen = SS * 3.2;
-    for (let i = 0; i < visible.length; i++) {
-      const n = visible[i];
-      const noteName = n.note.replace(/\d/g, '');
-      const isSharp = noteName.length === 2; // e.g. 'C#'
-      const step = staffStep(n.note);
-      const x = marginL + clefW + i * noteSpacing + noteSpacing / 2;
-      const y = yForStep(step);
-      // Fade oldest two notes so scroll-off feels softer
-      const alpha = i < 2 ? 0.4 + i * 0.2 : 0.85;
-      const ink = `rgba(255, 220, 200, ${alpha})`;
-
-      // Ledger line if outside staff
-      if (step <= -2) {
-        ctx.strokeStyle = ink;
-        const ly = yForStep(-2);
+      // Staff lines
+      ctx.strokeStyle = `rgba(255, 220, 200, ${0.32 * dim})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        const y = y0 + i * SS;
         ctx.beginPath();
-        ctx.moveTo(x - headW, ly);
-        ctx.lineTo(x + headW, ly);
-        ctx.stroke();
-      }
-      if (step >= 10) {
-        ctx.strokeStyle = ink;
-        const ly = yForStep(10);
-        ctx.beginPath();
-        ctx.moveTo(x - headW, ly);
-        ctx.lineTo(x + headW, ly);
+        ctx.moveTo(staffX, y);
+        ctx.lineTo(staffX + staffW, y);
         ctx.stroke();
       }
 
-      // Sharp accidental
-      if (isSharp) {
+      // Treble clef
+      ctx.fillStyle = `rgba(255, 220, 200, ${0.55 * dim})`;
+      ctx.font = `${staffH * 1.5}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('𝄞', staffX + clefW / 2, y0 + staffH / 2 + SS * 0.3);
+
+      // Notes on this line
+      for (let i = sliceStart; i < sliceEnd; i++) {
+        const n = composition[i];
+        const noteName = n.note.replace(/\d/g, '');
+        const isSharp = noteName.length === 2;
+        const step = staffStep(n.note);
+        const localIdx = i - sliceStart;
+        const x = staffX + clefW + localIdx * noteSpacing + noteSpacing / 2;
+        const y = yForStep(step);
+        const ink = `rgba(255, 220, 200, ${0.85 * dim})`;
+
+        // Ledger lines
+        if (step <= -2) {
+          ctx.strokeStyle = ink;
+          const ly = yForStep(-2);
+          ctx.beginPath();
+          ctx.moveTo(x - headW, ly);
+          ctx.lineTo(x + headW, ly);
+          ctx.stroke();
+        }
+        if (step >= 10) {
+          ctx.strokeStyle = ink;
+          const ly = yForStep(10);
+          ctx.beginPath();
+          ctx.moveTo(x - headW, ly);
+          ctx.lineTo(x + headW, ly);
+          ctx.stroke();
+        }
+
+        // Sharp accidental
+        if (isSharp) {
+          ctx.fillStyle = ink;
+          ctx.font = `${SS * 1.8}px serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('♯', x - headW - 3, y);
+        }
+
+        // Note head
         ctx.fillStyle = ink;
-        ctx.font = `${SS * 1.8}px serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('♯', x - headW - 3, y);
-      }
+        ctx.beginPath();
+        ctx.ellipse(x, y, headW / 2, headH / 2, -0.3, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Note head (filled oval, slightly tilted)
-      ctx.fillStyle = ink;
-      ctx.beginPath();
-      ctx.ellipse(x, y, headW / 2, headH / 2, -0.3, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Stem — down for notes above middle line (step > 4), up otherwise
-      const stemUp = step <= 4;
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      if (stemUp) {
-        ctx.moveTo(x + headW / 2 - 0.5, y);
-        ctx.lineTo(x + headW / 2 - 0.5, y - stemLen);
-      } else {
-        ctx.moveTo(x - headW / 2 + 0.5, y);
-        ctx.lineTo(x - headW / 2 + 0.5, y + stemLen);
+        // Stem
+        const stemUp = step <= 4;
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        if (stemUp) {
+          ctx.moveTo(x + headW / 2 - 0.5, y);
+          ctx.lineTo(x + headW / 2 - 0.5, y - stemLen);
+        } else {
+          ctx.moveTo(x - headW / 2 + 0.5, y);
+          ctx.lineTo(x - headW / 2 + 0.5, y + stemLen);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
     }
 
     ctx.restore();
