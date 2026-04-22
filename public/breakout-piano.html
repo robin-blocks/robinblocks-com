@@ -278,6 +278,11 @@
     }
   }
 
+  // Lookup: note name -> horizontal center px (used for playback visuals)
+  const noteToX = new Map();
+  for (const w of whites) noteToX.set(w.note, ((w.bStart + w.bEnd) / 2) * unitPx);
+  for (const b of blacks) noteToX.set(b.note, ((b.tStart + b.tEnd) / 2) * unitPx);
+
   // ---- Vertical dimensions ----
   const WKH = 160;              // white key total length
   const BKH = 96;               // black key length / upper-region height
@@ -363,6 +368,13 @@
   const floatingTexts = [];
   const tokens = []; // { x, y, vy } — "+2 balls" drops rising toward paddle
 
+  // Musical composition — every destroyed key is recorded; on win the
+  // whole sequence plays back with gaps clamped into a musical range.
+  const composition = []; // { note, freq, time } — time = ms since first hit
+  let compositionStart = 0;
+  let playbackGen = 0;   // increment to cancel any in-flight playback timeouts
+  let playbackUntil = 0; // timestamp when playback ends (0 = not playing)
+
   const launchBall = () => {
     balls.push({
       x: paddle.x + paddle.w / 2,
@@ -389,6 +401,10 @@
     recentHits.clear();
     floatingTexts.length = 0;
     tokens.length = 0;
+    composition.length = 0;
+    compositionStart = 0;
+    playbackGen++; // cancels any pending playback timeouts
+    playbackUntil = 0;
   };
 
   // ---- Input ----
@@ -512,8 +528,16 @@
           });
         }
 
-        // Chord bonus: record pitch class, look for triad in recent window
+        // Record the hit into the running composition
         const hitTime = performance.now();
+        if (composition.length === 0) compositionStart = hitTime;
+        composition.push({
+          note: best.note,
+          freq: best.freq,
+          time: hitTime - compositionStart,
+        });
+
+        // Chord bonus: record pitch class, look for triad in recent window
         const pc = pitchClass(best.note);
         recentHits.set(pc, hitTime);
         for (const [p, t] of recentHits) {
@@ -593,8 +617,41 @@
       }
     }
 
-    if (blocks.every(b => !b.alive)) won = true;
-    else if (lives === 0 && balls.length === 0) gameOver = true;
+    if (!won && blocks.every(b => !b.alive)) {
+      won = true;
+      playComposition();
+    } else if (lives === 0 && balls.length === 0) gameOver = true;
+  };
+
+  // Play back the recorded composition. Raw gameplay gaps get clamped to
+  // [50ms, 400ms] so a wild rally turns into something that actually sounds
+  // like music. playbackGen gates each scheduled note — resetGame bumps
+  // the counter to cancel any in-flight timeouts.
+  const playComposition = () => {
+    if (composition.length === 0) return;
+    const PLAYBACK_DELAY = 900;   // pause before starting, lets the "win" moment land
+    const MIN_GAP = 60, MAX_GAP = 400;
+    const myGen = ++playbackGen;
+    let scheduled = PLAYBACK_DELAY;
+    for (let i = 0; i < composition.length; i++) {
+      const entry = composition[i];
+      if (i > 0) {
+        const rawGap = entry.time - composition[i - 1].time;
+        scheduled += Math.max(MIN_GAP, Math.min(MAX_GAP, rawGap));
+      }
+      setTimeout(() => {
+        if (myGen !== playbackGen) return; // cancelled by reset
+        playNote(entry.freq, 0.7);
+        floatingTexts.push({
+          text: '♪ ' + entry.note,
+          x: noteToX.get(entry.note) ?? W / 2,
+          y: KEYBOARD_TOP - 8,
+          startTime: performance.now(),
+        });
+      }, scheduled);
+    }
+    // Tail buffer so "Playing…" overlay stays up until the last note fades
+    playbackUntil = performance.now() + scheduled + 1400;
   };
 
   // ---- Draw ----
@@ -782,7 +839,9 @@
     }
 
     if (gameOver || won) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      const playingBack = won && now < playbackUntil;
+      // Slightly lighter overlay during playback so the note floats stay visible
+      ctx.fillStyle = `rgba(0,0,0,${playingBack ? 0.4 : 0.6})`;
       ctx.fillRect(0, H / 2 - 80, W, 160);
       ctx.fillStyle = '#fff';
       ctx.font = '36px -apple-system, sans-serif';
@@ -794,7 +853,7 @@
       ctx.fillText(`Score ${score}   ·   Peak combo ×${peakMultiplier}`, W / 2, H / 2);
       ctx.font = '15px -apple-system, sans-serif';
       ctx.fillStyle = '#bbb';
-      ctx.fillText('tap to play again', W / 2, H / 2 + 32);
+      ctx.fillText(playingBack ? '♪ Playing your composition…' : 'tap to play again', W / 2, H / 2 + 32);
     }
   };
 
