@@ -115,6 +115,42 @@
     display: block;
   }
 
+  .sound-btn {
+    position: fixed;
+    bottom: 18px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    padding: 0;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    -webkit-tap-highlight-color: transparent;
+    transition: background .15s, border-color .15s, transform .15s, color .15s;
+  }
+  .sound-btn:hover { background: rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.32); }
+  .sound-btn:active { transform: scale(0.94); }
+  .sound-btn svg { display: block; }
+  .sound-btn.muted { color: rgba(255,180,180,0.9); }
+  .sound-btn .icon-muted { display: none; }
+  .sound-btn.muted .icon-on { display: none; }
+  .sound-btn.muted .icon-muted { display: block; }
+  .sound-btn.pulse {
+    animation: soundPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes soundPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 216, 77, 0.0); }
+    50% { box-shadow: 0 0 0 8px rgba(255, 216, 77, 0.15); }
+  }
+
   /* Mobile (any orientation): full-bleed field */
   @media (max-width: 1000px) {
     html, body { height: 100dvh; overflow: hidden; }
@@ -164,6 +200,19 @@
     <canvas id="game" width="480" height="720"></canvas>
   </div>
 </div>
+<audio id="silent-loop" src="/silent.wav" loop preload="auto" playsinline style="display:none"></audio>
+<button id="sound-btn" class="sound-btn pulse" type="button" aria-label="Toggle sound">
+  <svg class="icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+  </svg>
+  <svg class="icon-muted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+    <line x1="23" y1="9" x2="17" y2="15"/>
+    <line x1="17" y1="9" x2="23" y2="15"/>
+  </svg>
+</button>
 <script>
   // On mobile, match canvas internal dims to the viewport aspect so CSS
   // stretching doesn't distort the bird or pipes. Portrait gets a taller
@@ -313,20 +362,91 @@
   // one permission is denied) we fall back to mic-only — mic is essential
   // for gameplay; camera is decorative.
   const video = document.getElementById('cam');
+  const silentEl = document.getElementById('silent-loop');
+  const soundBtn = document.getElementById('sound-btn');
+  if (silentEl) silentEl.volume = 0.001;
   let mediaRequested = false;
   let audioCtx = null, analyser = null, pitchBuf = null;
+  let masterGain = null;
+  let muted = (() => {
+    try { return localStorage.getItem('happy-bard-muted') === '1'; }
+    catch { return false; }
+  })();
 
   // Create the AudioContext synchronously inside the first user gesture so
   // oscillator scheduling works immediately (before the async getUserMedia
   // promise resolves). The mic analyser is bolted on later in hookupMic.
+  //
+  // iOS unlock: three pieces run inside the gesture —
+  //   1) start the near-silent <audio loop> so the audio session flips
+  //      from "Ambient" (respects the ring/silent switch) to "Playback"
+  //   2) play a tiny empty buffer through the AudioContext to kick the
+  //      graph awake
+  //   3) explicitly resume() in case the context came up suspended.
+  const iosUnlock = () => {
+    if (!audioCtx) return;
+    try {
+      const buf = audioCtx.createBuffer(1, Math.max(1, (audioCtx.sampleRate * 0.05) | 0), audioCtx.sampleRate);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch (e) {}
+    if (silentEl && silentEl.paused) silentEl.play().catch(() => {});
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  };
   const ensureAudioCtx = () => {
-    if (audioCtx) return audioCtx;
+    if (audioCtx) { iosUnlock(); updateSoundIcon(); return audioCtx; }
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) { return null; }
-    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = muted ? 0 : 1;
+    masterGain.connect(audioCtx.destination);
+    iosUnlock();
+    updateSoundIcon();
     return audioCtx;
   };
+  const audioOut = () => masterGain || (audioCtx ? audioCtx.destination : null);
+  const playBeep = (freq = 660, dur = 0.12) => {
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain).connect(audioOut());
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  };
+  const updateSoundIcon = () => {
+    if (!soundBtn) return;
+    soundBtn.classList.toggle('muted', muted);
+    // Remove the attention-pulse once the user has interacted with audio.
+    if (audioCtx) soundBtn.classList.remove('pulse');
+    soundBtn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
+  };
+  const setMuted = (m) => {
+    muted = m;
+    try { localStorage.setItem('happy-bard-muted', m ? '1' : '0'); } catch {}
+    if (masterGain) masterGain.gain.value = m ? 0 : 1;
+    updateSoundIcon();
+  };
+  const onSoundClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    ensureAudioCtx();           // creates + runs iOS unlock if needed, or
+                                // re-runs unlock if the session went stale
+    setMuted(!muted);
+    if (!muted) playBeep();     // positive feedback when turning sound on
+  };
+  if (soundBtn) {
+    soundBtn.addEventListener('click', onSoundClick);
+    updateSoundIcon();
+  }
 
   const hookupMic = (stream) => {
     if (!audioCtx) ensureAudioCtx();
@@ -444,7 +564,7 @@
     gain.gain.linearRampToValueAtTime(peak, startAt + 0.02);
     gain.gain.setValueAtTime(peak, startAt + Math.max(0.02, dur - rel));
     gain.gain.exponentialRampToValueAtTime(0.001, startAt + dur);
-    osc.connect(gain).connect(audioCtx.destination);
+    osc.connect(gain).connect(audioOut());
     osc.start(startAt);
     osc.stop(startAt + dur + 0.05);
   };
@@ -465,7 +585,7 @@
     gain.gain.setValueAtTime(0, when);
     gain.gain.linearRampToValueAtTime(emphasis ? 0.2 : 0.14, when + 0.004);
     gain.gain.exponentialRampToValueAtTime(0.001, when + 0.09);
-    osc.connect(gain).connect(audioCtx.destination);
+    osc.connect(gain).connect(audioOut());
     osc.start(when);
     osc.stop(when + 0.1);
   };
