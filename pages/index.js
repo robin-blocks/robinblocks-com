@@ -268,6 +268,7 @@ const CSS = `
   .logo.instagram { background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); }
   .logo.facebook { background: #1877F2; }
   .logo.breakout { background: linear-gradient(135deg, oklch(0.72 0.17 75), oklch(0.65 0.18 30)); }
+  .logo.happybard { background: linear-gradient(135deg, oklch(0.75 0.14 230), oklch(0.72 0.18 30)); }
   .logo.museverse { background: linear-gradient(135deg, oklch(0.55 0.18 280), oklch(0.65 0.17 320)); }
   .logo.polydance { background: linear-gradient(135deg, oklch(0.70 0.18 150), oklch(0.65 0.18 200)); }
   .logo.email    { background: #444; }
@@ -562,6 +563,10 @@ const BODY_HTML = `
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="10" width="18" height="10" rx="2"/><path d="M7 10v10M11 10v10M15 10v10"/></svg>
             <span>Breakout Piano</span>
           </div>
+          <div class="menu-item" onclick="document.getElementById('menu').classList.remove('show'); window.location.href='/happy-bard.html'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <span>Happy Bard</span>
+          </div>
         </div>
       </div>
     </div>
@@ -759,6 +764,7 @@ function initApp() {
       title: 'Projects',
       items: [
         { id: 'breakout', logo: 'breakout', label: 'Breakout Piano', sublabel: 'A mini-game where you play Breakout and hit piano keys', href: '/breakout-piano.html', tag: 'project', priority: 1, due: 'Play →', isLocal: true },
+        { id: 'happybard', logo: 'happybard', label: 'Happy Bard', sublabel: 'Flappy Bird, but you sing to keep the bird aloft', href: '/happy-bard.html', tag: 'project', priority: 1, due: 'Play →', isLocal: true },
         { id: 'museverse', logo: 'museverse', label: 'Museverse', sublabel: 'museverse.xyz', href: 'https://museverse.xyz', tag: 'project', priority: 2, due: 'Visit' },
         { id: 'polydance', logo: 'polydance', label: 'Polydance', sublabel: 'polydance.net', href: 'https://polydance.net', tag: 'project', priority: 2, due: 'Visit' },
       ],
@@ -785,6 +791,7 @@ function initApp() {
     facebook: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12a12 12 0 1 0-13.88 11.85v-8.38H7.08V12h3.04V9.36c0-3 1.79-4.67 4.53-4.67 1.31 0 2.68.24 2.68.24v2.95h-1.51c-1.49 0-1.95.92-1.95 1.87V12h3.32l-.53 3.47h-2.79v8.38A12 12 0 0 0 24 12z"/></svg>',
     email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
     breakout: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="4" width="4" height="3" rx="0.5"/><rect x="9" y="4" width="4" height="3" rx="0.5"/><rect x="15" y="4" width="6" height="3" rx="0.5"/><circle cx="12" cy="14" r="1.5"/><rect x="7" y="19" width="10" height="2" rx="1"/></svg>',
+    happybard: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
     museverse: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3 6.5 3.6L12 11.5 5.5 7.9 12 4.3zM5 9.6l6 3.4v7L5 16.6V9.6zm14 0v7L13 20v-7l6-3.4z"/></svg>',
     polydance: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="8" r="3" opacity=".9"/><circle cx="16" cy="10" r="3" opacity=".7"/><circle cx="10" cy="16" r="3" opacity=".8"/><circle cx="17" cy="17" r="2" opacity=".6"/></svg>',
   };

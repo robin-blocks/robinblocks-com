@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Happy Bard · Robin Blocks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #152033;
+    --ink: #e8ecf5;
+    --ink-2: #b7c0d4;
+    --ink-3: #6f7a92;
+    --chrome: rgba(255,255,255,0.06);
+    --chrome-hover: rgba(255,255,255,0.12);
+    --chrome-border: rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: var(--ink);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .topbar > * { pointer-events: auto; }
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    color: var(--ink);
+    background: var(--chrome);
+    border: 1px solid var(--chrome-border);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .15s;
+  }
+  .back-btn:hover {
+    background: var(--chrome-hover);
+    border-color: rgba(255,255,255,0.18);
+  }
+  .back-btn:active { transform: translateY(1px); }
+  .back-btn svg { display: block; }
+  .brand {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .brand b { color: var(--ink); font-weight: 700; letter-spacing: -0.01em; }
+  .stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 80px 16px 32px;
+  }
+  #hint {
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  .field {
+    position: relative;
+    background: linear-gradient(180deg, #1f3357 0%, #4a5a87 55%, #d6a380 100%);
+    border: 1px solid #0d1628;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.55);
+    overflow: hidden;
+    line-height: 0;
+  }
+  .cam {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    filter: brightness(0.75) saturate(0.9);
+    opacity: 0;
+    transition: opacity .45s ease;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .cam.on { opacity: 1; }
+  canvas {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    cursor: pointer;
+    max-width: 100%;
+    height: auto;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    display: block;
+  }
+
+  /* Mobile (any orientation): full-bleed field */
+  @media (max-width: 1000px) {
+    html, body { height: 100dvh; overflow: hidden; }
+    .stage {
+      padding: 0;
+      min-height: 100dvh;
+      height: 100dvh;
+    }
+    #hint { display: none; }
+    .brand { display: none; }
+    .field {
+      width: 100vw;
+      height: 100dvh;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    canvas {
+      width: 100vw;
+      height: 100dvh;
+      max-width: none;
+    }
+    .topbar { padding: 8px 10px; }
+    .back-btn {
+      padding: 5px 9px;
+      font-size: 12px;
+      opacity: 0.65;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .back-btn:active { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="back-btn" href="/" aria-label="Back to home">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <span>Back</span>
+  </a>
+  <div class="brand"><b>Happy Bard</b> · robinblocks.com</div>
+</div>
+<div class="stage">
+  <div id="hint">Tap to start · Listen to the tune, then sing it back to fly the bird</div>
+  <div class="field">
+    <video id="cam" class="cam" autoplay playsinline muted></video>
+    <canvas id="game" width="480" height="720"></canvas>
+  </div>
+</div>
+<script>
+  // On mobile, match canvas internal dims to the viewport aspect so CSS
+  // stretching doesn't distort the bird or pipes. Portrait gets a taller
+  // field; landscape stays wider.
+  (() => {
+    if (!window.matchMedia('(max-width: 1000px)').matches) return;
+    const canvas = document.getElementById('game');
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (vh >= vw) {
+      canvas.height = 900;
+      canvas.width = Math.max(360, Math.round(900 * vw / vh));
+    } else {
+      canvas.height = 600;
+      canvas.width = Math.min(2000, Math.round(600 * vw / vh));
+    }
+  })();
+</script>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // ---- Game constants (tuned for a 720-tall field; scaled by H) ----
+  const S = H / 720;
+  const GRAVITY = 1700 * S;        // px/s^2 (applied only when no pitch detected)
+  const PIPE_SPEED = 200 * S;      // px/s leftward scroll
+  const PIPE_GAP = 240 * S;        // vertical tolerance inside each note's pipe
+  const GROUND_H = 80 * S;
+  const BIRD_R = 16 * S;
+  const BIRD_X = Math.round(W * 0.28);
+
+  // ---- Pitch → height mapping ----
+  // Two-octave range from G3 (196Hz) to G5 (784Hz). Covers comfortable
+  // singing for most voices and gives plenty of headroom around the C4–C5
+  // region where Twinkle Twinkle lives.
+  const PITCH_MIN = 196;           // Hz — maps to just above the ground
+  const PITCH_MAX = 784;           // Hz — maps to near the top
+  const LOG_MIN = Math.log2(PITCH_MIN);
+  const LOG_MAX = Math.log2(PITCH_MAX);
+  const pitchToY = (hz) => {
+    const clamped = Math.max(PITCH_MIN, Math.min(PITCH_MAX, hz));
+    const t = (Math.log2(clamped) - LOG_MIN) / (LOG_MAX - LOG_MIN);
+    const topPad = 50 * S;
+    const botPad = GROUND_H + 40 * S;
+    return (H - botPad) - t * (H - botPad - topPad);
+  };
+  const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const freqToNote = (hz) => {
+    if (hz <= 0) return null;
+    const midi = 69 + 12 * Math.log2(hz / 440);
+    const nearest = Math.round(midi);
+    const cents = Math.round((midi - nearest) * 100);
+    const name = NOTE_NAMES[((nearest % 12) + 12) % 12];
+    const octave = Math.floor(nearest / 12) - 1;
+    return { name: name + octave, cents };
+  };
+  const SEMI = { C:-9,'C#':-8, D:-7,'D#':-6, E:-5, F:-4,'F#':-3, G:-2,'G#':-1, A:0,'A#':1, B:2 };
+  const noteFreq = (n) => {
+    const m = n.match(/^([A-G]#?)(\d)$/);
+    if (!m) return 440;
+    const semis = SEMI[m[1]] + (parseInt(m[2]) - 4) * 12;
+    return 440 * Math.pow(2, semis / 12);
+  };
+
+  // ---- Song (Twinkle, Twinkle, Little Star — first 2 melodic phrases) ----
+  // Each entry: pitch, length in beats, and the syllable that's sung on it.
+  // "beats: 2" on the phrase-ending notes (star / are) gives the natural
+  // breath at the end of each line.
+  const SONG = {
+    tempo: 100,
+    notes: [
+      { note: 'C4', beats: 1, syl: 'Twin' },
+      { note: 'C4', beats: 1, syl: 'kle' },
+      { note: 'G4', beats: 1, syl: 'twin' },
+      { note: 'G4', beats: 1, syl: 'kle' },
+      { note: 'A4', beats: 1, syl: 'lit' },
+      { note: 'A4', beats: 1, syl: 'tle' },
+      { note: 'G4', beats: 2, syl: 'star' },
+      { note: 'F4', beats: 1, syl: 'How' },
+      { note: 'F4', beats: 1, syl: 'I' },
+      { note: 'E4', beats: 1, syl: 'won' },
+      { note: 'E4', beats: 1, syl: 'der' },
+      { note: 'D4', beats: 1, syl: 'what' },
+      { note: 'D4', beats: 1, syl: 'you' },
+      { note: 'C4', beats: 2, syl: 'are' },
+    ],
+  };
+  const BEAT_SEC = 60 / SONG.tempo;
+  const LEAD_IN_BEATS = 5;            // silent count-in before the first note
+                                      // (last 3 beats are the 3-2-1 countdown;
+                                      // first 2 give pipes time to scroll in
+                                      // on narrow viewports)
+  const TAIL_BEATS = 3;               // breathing room after the last note
+  // Visual + physical gap between adjacent note-pipes. Must exceed the bird's
+  // diameter (2 * BIRD_R = 32 * S) so the bird has a true free-air window at
+  // note transitions — otherwise it's always inside at least one pipe and
+  // the safe y-window at big leaps collapses to the intersection alone.
+  const NOTE_GAP_PX = 40 * S;
+  const noteSchedule = (() => {
+    const out = [];
+    let beat = 0;
+    for (const n of SONG.notes) {
+      out.push({ note: n.note, beats: n.beats, syl: n.syl, beatStart: beat });
+      beat += n.beats;
+    }
+    return out;
+  })();
+  const SONG_TOTAL_BEATS = noteSchedule.reduce((a, n) => a + n.beats, 0);
+  const PHASE_END_BEATS = LEAD_IN_BEATS + SONG_TOTAL_BEATS + TAIL_BEATS;
+  const BEATS_TO_PX = PIPE_SPEED * BEAT_SEC;
+
+  // ---- State ----
+  // READY   → idle splash
+  // LISTEN  → melody plays; bird auto-pilots through the gaps as a demo
+  // SING    → user sings to fly through the same melody
+  // DONE    → round finished (either by collision or by reaching the end)
+  const STATE = { READY: 'ready', LISTEN: 'listen', SING: 'sing', DONE: 'done' };
+  let state = STATE.READY;
+  let bird = { y: H / 2, v: 0, rot: 0 };
+  let beatsElapsed = 0;            // time within current phase, in beats
+  let phaseStartT = 0;             // performance.now() when phase began
+  let diedInPhase = false;         // true if SING ended by collision
+  let notesPassed = 0;
+  let best = (() => {
+    try { return parseInt(localStorage.getItem('happy-bard-best') || '0', 10) || 0; }
+    catch { return 0; }
+  })();
+  let lastT = 0;
+  let flashT = 0;
+
+  const reset = () => {
+    bird = { y: H / 2, v: 0, rot: 0 };
+    beatsElapsed = 0;
+    phaseStartT = 0;
+    diedInPhase = false;
+    notesPassed = 0;
+    flashT = 0;
+    state = STATE.READY;
+  };
+
+  // ---- Media: front camera + mic, both requested on first user gesture ----
+  // iOS requires getUserMedia inside a user gesture, so we kick off both
+  // camera and mic from the first tap. Camera + audio in one call means
+  // one permission prompt; if that combined call fails (common when only
+  // one permission is denied) we fall back to mic-only — mic is essential
+  // for gameplay; camera is decorative.
+  const video = document.getElementById('cam');
+  let mediaRequested = false;
+  let audioCtx = null, analyser = null, pitchBuf = null;
+
+  // Create the AudioContext synchronously inside the first user gesture so
+  // oscillator scheduling works immediately (before the async getUserMedia
+  // promise resolves). The mic analyser is bolted on later in hookupMic.
+  const ensureAudioCtx = () => {
+    if (audioCtx) return audioCtx;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) { return null; }
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    return audioCtx;
+  };
+
+  const hookupMic = (stream) => {
+    if (!audioCtx) ensureAudioCtx();
+    if (!audioCtx) return;
+    try {
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      pitchBuf = new Float32Array(analyser.fftSize);
+      source.connect(analyser);
+    } catch (e) {
+      analyser = null;
+    }
+  };
+  const hookupCamera = (stream) => {
+    video.srcObject = stream;
+    video.play().catch(() => {});
+    video.classList.add('on');
+  };
+
+  const initMedia = async () => {
+    if (mediaRequested) return;
+    mediaRequested = true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    const audioConstraints = {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    };
+    try {
+      // Preferred path: one prompt, both streams.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints,
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      hookupCamera(new MediaStream(stream.getVideoTracks()));
+      hookupMic(new MediaStream(stream.getAudioTracks()));
+    } catch (e) {
+      // Fall back: mic-only (gameplay requires it; camera is optional).
+      try {
+        const micOnly = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        hookupMic(micOnly);
+      } catch (e2) {
+        // No mic either — pitch stays -1, bird just falls with gravity.
+      }
+    }
+  };
+
+  // ---- Pitch detection (autocorrelation) ----
+  // Adapted from Chris Wilson's classic PitchDetect demo. O(N²) on the
+  // sample window; N=1024 is about 1M ops/frame, well within budget.
+  const CORR_N = 1024;
+  const corrBuf = new Float32Array(CORR_N);
+  const autoCorrelate = (buf, sampleRate) => {
+    const SIZE = Math.min(buf.length, CORR_N);
+    let rms = 0;
+    for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / SIZE);
+    if (rms < 0.015) return -1; // too quiet — treat as silence
+    for (let i = 0; i < SIZE; i++) corrBuf[i] = 0;
+    for (let i = 0; i < SIZE; i++) {
+      let sum = 0;
+      for (let j = 0; j < SIZE - i; j++) sum += buf[j] * buf[j + i];
+      corrBuf[i] = sum;
+    }
+    let d = 0;
+    while (d < SIZE - 1 && corrBuf[d] > corrBuf[d + 1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i = d; i < SIZE; i++) {
+      if (corrBuf[i] > maxval) { maxval = corrBuf[i]; maxpos = i; }
+    }
+    if (maxpos <= 0) return -1;
+    let T0 = maxpos;
+    const x1 = corrBuf[T0 - 1], x2 = corrBuf[T0], x3 = corrBuf[T0 + 1];
+    const a = (x1 + x3 - 2 * x2) / 2;
+    const b = (x3 - x1) / 2;
+    if (a) T0 = T0 - b / (2 * a);
+    return sampleRate / T0;
+  };
+
+  const pitch = { hz: -1, smooth: -1 };
+  let pitchFrameCount = 0;
+  const updatePitch = () => {
+    if (!analyser) return;
+    // Run detection every 2nd frame (~30Hz) to keep mobile Safari happy;
+    // the bird's y interpolates smoothly between updates either way.
+    pitchFrameCount++;
+    if (pitchFrameCount % 2 !== 0) return;
+    analyser.getFloatTimeDomainData(pitchBuf);
+    const raw = autoCorrelate(pitchBuf, audioCtx.sampleRate);
+    // Reject out-of-range results (sub-bass rumble, fricatives, etc.)
+    if (raw > 60 && raw < 1200) {
+      pitch.smooth = pitch.smooth < 0 ? raw : pitch.smooth * 0.7 + raw * 0.3;
+      pitch.hz = pitch.smooth;
+    } else {
+      pitch.hz = -1;
+      pitch.smooth = -1;
+    }
+  };
+
+  // ---- Melody playback (triangle-wave oscillators with a short ADSR) ----
+  // Used during the LISTEN phase so the player hears the tune they need to
+  // reproduce. Deliberately silent during SING: playback through the
+  // speakers would bleed into the mic and confuse pitch detection.
+  const playNoteAt = (noteName, startAt, dur) => {
+    if (!audioCtx) return;
+    const freq = noteFreq(noteName);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const peak = 0.2;
+    const rel = Math.min(0.18, dur * 0.35);
+    gain.gain.setValueAtTime(0, startAt);
+    gain.gain.linearRampToValueAtTime(peak, startAt + 0.02);
+    gain.gain.setValueAtTime(peak, startAt + Math.max(0.02, dur - rel));
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(startAt);
+    osc.stop(startAt + dur + 0.05);
+  };
+  const scheduleMelody = () => {
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime + LEAD_IN_BEATS * BEAT_SEC;
+    for (const n of noteSchedule) {
+      playNoteAt(n.note, t0 + n.beatStart * BEAT_SEC, n.beats * BEAT_SEC);
+    }
+  };
+  // Short percussive click, used for the 3-2-1 sing-in countdown.
+  const playTick = (when, emphasis) => {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = emphasis ? 1100 : 700;
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(emphasis ? 0.2 : 0.14, when + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + 0.09);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(when);
+    osc.stop(when + 0.1);
+  };
+  const scheduleCountdown = () => {
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    // Ticks on the last 3 beats of the lead-in, plus an emphasis "go" tick
+    // at the beat the first note hits the bird.
+    for (let i = 3; i >= 1; i--) playTick(t0 + (LEAD_IN_BEATS - i) * BEAT_SEC, false);
+    playTick(t0 + LEAD_IN_BEATS * BEAT_SEC, true);
+  };
+
+  const startPhase = (newState) => {
+    state = newState;
+    phaseStartT = performance.now();
+    beatsElapsed = 0;
+    bird = { y: H / 2, v: 0, rot: 0 };
+    diedInPhase = false;
+    notesPassed = 0;
+    if (newState === STATE.LISTEN) scheduleMelody();
+    else if (newState === STATE.SING) scheduleCountdown();
+  };
+
+  const press = () => {
+    if (state === STATE.READY) {
+      ensureAudioCtx();        // sync, so we can schedule notes immediately
+      initMedia();             // async; fills in analyser + camera later
+      startPhase(STATE.LISTEN);
+    } else if (state === STATE.DONE) {
+      reset();
+    }
+    // During LISTEN / SING, taps are ignored — the song drives the tempo.
+  };
+
+  // ---- Input ----
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+      e.preventDefault();
+      press();
+    }
+  });
+  const onPointer = (e) => { e.preventDefault(); press(); };
+  canvas.addEventListener('pointerdown', onPointer);
+  canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+
+  // ---- Piano-roll pipes ----
+  // Each song note is a pipe pair. Horizontal position is derived from
+  // beatsElapsed (so the bird at BIRD_X always sits on "now"); vertical
+  // gap position comes from pitchToY(noteFreq(note)). A small NOTE_GAP_PX
+  // leaves breathing room between adjacent notes so the bird has a moment
+  // of free y-movement between them.
+  const computePipes = () => {
+    const songBeats = beatsElapsed - LEAD_IN_BEATS;
+    const out = [];
+    for (const n of noteSchedule) {
+      const x = BIRD_X + (n.beatStart - songBeats) * BEATS_TO_PX;
+      const width = n.beats * BEATS_TO_PX - NOTE_GAP_PX;
+      if (x + width < -60 || x > W + 60) continue;
+      out.push({
+        x,
+        width,
+        gapY: pitchToY(noteFreq(n.note)),
+        note: n.note,
+        syl: n.syl,
+        beatStart: n.beatStart,
+        beatEnd: n.beatStart + n.beats,
+      });
+    }
+    return out;
+  };
+
+  const collides = (b, pipes) => {
+    if (b.y + BIRD_R >= H - GROUND_H) return true;
+    if (b.y - BIRD_R <= 0) return true;
+    for (const p of pipes) {
+      const inX = BIRD_X + BIRD_R > p.x && BIRD_X - BIRD_R < p.x + p.width;
+      if (!inX) continue;
+      const gapTop = p.gapY - PIPE_GAP / 2;
+      const gapBot = p.gapY + PIPE_GAP / 2;
+      if (b.y - BIRD_R < gapTop) return true;
+      if (b.y + BIRD_R > gapBot) return true;
+    }
+    return false;
+  };
+
+  // ---- Update ----
+  // Shared smoothing toward a target y, with rotation derived from
+  // instantaneous apparent velocity. Used by both auto-pilot (LISTEN) and
+  // pitch-driven (SING) flight.
+  const glideTo = (targetY, rate, dt) => {
+    const alpha = 1 - Math.exp(-rate * dt);
+    const prevY = bird.y;
+    bird.y = bird.y + (targetY - bird.y) * alpha;
+    bird.v = 0;
+    const moveV = (bird.y - prevY) / Math.max(dt, 0.001);
+    const tgt = Math.max(-0.5, Math.min(1.1, moveV / (600 * S)));
+    bird.rot += (tgt - bird.rot) * Math.min(1, dt * 8);
+  };
+  const currentNote = () => {
+    const sb = beatsElapsed - LEAD_IN_BEATS;
+    if (sb < 0) return null;
+    for (const n of noteSchedule) {
+      if (sb >= n.beatStart && sb < n.beatStart + n.beats) return n;
+    }
+    return null;
+  };
+  // Demo-flight target during LISTEN. Anchors each note's y at the middle
+  // of its pipe and smoothsteps between anchors, so the bird is already
+  // *moving* before a note boundary (instead of snapping at the boundary
+  // and then chasing via exponential glide). Without this, on big leaps
+  // the bird visibly clips the next pipe while it catches up.
+  const listenTarget = (songBeats) => {
+    if (noteSchedule.length === 0) return H / 2;
+    const first = noteSchedule[0];
+    const last = noteSchedule[noteSchedule.length - 1];
+    const firstCenter = first.beatStart + first.beats / 2;
+    const lastCenter = last.beatStart + last.beats / 2;
+    if (songBeats <= firstCenter) return pitchToY(noteFreq(first.note));
+    if (songBeats >= lastCenter) return pitchToY(noteFreq(last.note));
+    let i = 0;
+    while (i < noteSchedule.length - 1) {
+      const nextCenter = noteSchedule[i + 1].beatStart + noteSchedule[i + 1].beats / 2;
+      if (nextCenter > songBeats) break;
+      i++;
+    }
+    const cur = noteSchedule[i];
+    const next = noteSchedule[i + 1];
+    const curCenter = cur.beatStart + cur.beats / 2;
+    const nextCenter = next.beatStart + next.beats / 2;
+    const curY = pitchToY(noteFreq(cur.note));
+    const nextY = pitchToY(noteFreq(next.note));
+    const t = (songBeats - curCenter) / (nextCenter - curCenter);
+    const s = t * t * (3 - 2 * t); // smoothstep
+    return curY + (nextY - curY) * s;
+  };
+
+  const update = (dt) => {
+    updatePitch();
+    if (state === STATE.LISTEN || state === STATE.SING) {
+      beatsElapsed = (performance.now() - phaseStartT) / 1000 / BEAT_SEC;
+    }
+
+    if (state === STATE.LISTEN) {
+      const songBeats = beatsElapsed - LEAD_IN_BEATS;
+      glideTo(listenTarget(songBeats), 14, dt);
+      if (beatsElapsed >= PHASE_END_BEATS) startPhase(STATE.SING);
+    } else if (state === STATE.SING) {
+      if (beatsElapsed < LEAD_IN_BEATS) {
+        // Pre-countdown: no gravity, no collision. Glide the bird to the
+        // first note's y so the player can see where they need to aim.
+        const firstNote = noteSchedule[0];
+        const targetY = firstNote ? pitchToY(noteFreq(firstNote.note)) : H / 2;
+        glideTo(targetY, 6, dt);
+      } else {
+        if (pitch.hz > 0) {
+          glideTo(pitchToY(pitch.hz), 14, dt);
+        } else {
+          bird.v += GRAVITY * dt;
+          bird.y += bird.v * dt;
+          const tgt = Math.max(-0.5, Math.min(1.1, bird.v / (900 * S)));
+          bird.rot += (tgt - bird.rot) * Math.min(1, dt * 8);
+        }
+        const pipes = computePipes();
+        const songBeats = beatsElapsed - LEAD_IN_BEATS;
+        let passed = 0;
+        for (const n of noteSchedule) if (songBeats > n.beatStart + n.beats) passed++;
+        notesPassed = passed;
+        const finishRound = (died) => {
+          diedInPhase = died;
+          flashT = died ? 0.3 : 0;
+          state = STATE.DONE;
+          if (notesPassed > best) {
+            best = notesPassed;
+            try { localStorage.setItem('happy-bard-best', String(best)); } catch {}
+          }
+        };
+        if (collides(bird, pipes)) finishRound(true);
+        else if (beatsElapsed >= PHASE_END_BEATS) finishRound(false);
+      }
+    } else if (state === STATE.DONE) {
+      if (diedInPhase && bird.y + BIRD_R < H - GROUND_H) {
+        bird.v += GRAVITY * dt;
+        bird.y += bird.v * dt;
+        bird.rot = Math.min(1.3, bird.rot + dt * 3);
+        if (bird.y + BIRD_R > H - GROUND_H) bird.y = H - GROUND_H - BIRD_R;
+      }
+      flashT = Math.max(0, flashT - dt);
+    } else if (state === STATE.READY) {
+      bird.y = H / 2 + Math.sin(performance.now() / 350) * 10 * S;
+      bird.rot = 0;
+    }
+  };
+
+  // ---- Draw ----
+  const drawBird = () => {
+    ctx.save();
+    ctx.translate(BIRD_X, bird.y);
+    ctx.rotate(bird.rot);
+    // Body
+    ctx.fillStyle = '#ffd84d';
+    ctx.strokeStyle = '#3d2a10';
+    ctx.lineWidth = 2 * S;
+    ctx.beginPath();
+    ctx.arc(0, 0, BIRD_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Wing
+    ctx.fillStyle = '#f0b942';
+    ctx.beginPath();
+    ctx.ellipse(-BIRD_R * 0.15, BIRD_R * 0.1, BIRD_R * 0.6, BIRD_R * 0.35, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Eye
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(BIRD_R * 0.4, -BIRD_R * 0.25, BIRD_R * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#202028';
+    ctx.beginPath();
+    ctx.arc(BIRD_R * 0.5, -BIRD_R * 0.22, BIRD_R * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    // Beak
+    ctx.fillStyle = '#ff944d';
+    ctx.strokeStyle = '#8a3a12';
+    ctx.beginPath();
+    ctx.moveTo(BIRD_R * 0.8, -BIRD_R * 0.05);
+    ctx.lineTo(BIRD_R * 1.5, BIRD_R * 0.05);
+    ctx.lineTo(BIRD_R * 0.8, BIRD_R * 0.25);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const drawPipe = (p) => {
+    const capH = 18 * S;
+    const gapTop = p.gapY - PIPE_GAP / 2;
+    const gapBot = p.gapY + PIPE_GAP / 2;
+    // Highlight the pipe the bird is currently passing through.
+    const active = BIRD_X >= p.x && BIRD_X <= p.x + p.width;
+    ctx.fillStyle = active ? '#7bd45c' : '#5fb84a';
+    ctx.strokeStyle = '#2b5e1f';
+    ctx.lineWidth = 2 * S;
+    // Top pipe + cap
+    ctx.fillRect(p.x, 0, p.width, gapTop);
+    ctx.strokeRect(p.x, 0, p.width, gapTop);
+    ctx.fillRect(p.x - 4 * S, gapTop - capH, p.width + 8 * S, capH);
+    ctx.strokeRect(p.x - 4 * S, gapTop - capH, p.width + 8 * S, capH);
+    // Bottom pipe + cap
+    const botH = H - GROUND_H - gapBot;
+    ctx.fillRect(p.x, gapBot, p.width, botH);
+    ctx.strokeRect(p.x, gapBot, p.width, botH);
+    ctx.fillRect(p.x - 4 * S, gapBot, p.width + 8 * S, capH);
+    ctx.strokeRect(p.x - 4 * S, gapBot, p.width + 8 * S, capH);
+
+    // Labels: syllable on top pipe, note letter on bottom pipe — both
+    // centered over the pipe column so they read like a piano roll.
+    const cx = p.x + p.width / 2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    // Syllable (top) — white with a dark stroke so it reads over any skin/background.
+    ctx.font = `700 ${Math.round(17 * S)}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 3 * S;
+    const sylY = Math.max(26 * S, gapTop - capH - 10 * S);
+    ctx.strokeText(p.syl, cx, sylY);
+    ctx.fillText(p.syl, cx, sylY);
+    // Note name (bottom) — smaller, secondary.
+    ctx.font = `600 ${Math.round(13 * S)}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 2 * S;
+    const noteY = gapBot + capH + 16 * S;
+    ctx.strokeText(p.note, cx, noteY);
+    ctx.fillText(p.note, cx, noteY);
+    ctx.restore();
+  };
+
+  const drawGround = () => {
+    // Sandy strip
+    ctx.fillStyle = '#d9b27a';
+    ctx.fillRect(0, H - GROUND_H, W, GROUND_H);
+    // Grass line
+    ctx.fillStyle = '#7ec94a';
+    ctx.fillRect(0, H - GROUND_H, W, 12 * S);
+    ctx.fillStyle = '#58a03a';
+    ctx.fillRect(0, H - GROUND_H + 12 * S, W, 4 * S);
+    // Texture dashes
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    for (let i = 0; i < W; i += 24 * S) {
+      ctx.fillRect(i, H - GROUND_H + 30 * S, 12 * S, 2 * S);
+    }
+  };
+
+  const drawPhaseBanner = () => {
+    const label = state === STATE.LISTEN ? 'LISTEN' : 'YOUR TURN';
+    const color = state === STATE.LISTEN ? 'rgba(190, 215, 255, 0.95)' : 'rgba(255, 216, 77, 0.95)';
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = `700 ${Math.round(14 * S)}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 3 * S;
+    ctx.strokeText(label, W / 2, 26 * S);
+    ctx.fillText(label, W / 2, 26 * S);
+    // Progress pip under the label
+    const total = PHASE_END_BEATS;
+    const done = Math.max(0, Math.min(total, beatsElapsed)) / total;
+    const barW = 120 * S;
+    const barX = W / 2 - barW / 2;
+    const barY = 36 * S;
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(barX, barY, barW, 3 * S);
+    ctx.fillStyle = color;
+    ctx.fillRect(barX, barY, barW * done, 3 * S);
+    // Notes passed (SING only)
+    if (state === STATE.SING) {
+      ctx.font = `600 ${Math.round(14 * S)}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = '#fff';
+      ctx.strokeText(`${notesPassed} / ${noteSchedule.length}`, W / 2, 58 * S);
+      ctx.fillText(`${notesPassed} / ${noteSchedule.length}`, W / 2, 58 * S);
+    }
+    ctx.restore();
+  };
+
+  // Big 3-2-1-Sing! overlay during the SING phase lead-in. Each digit
+  // appears on its beat (bold + bright), scales down and fades over the
+  // beat so the player can still see the first pipe scrolling in
+  // underneath. "Sing!" flashes when the first note's pipe hits the bird.
+  const drawCountdown = () => {
+    if (state !== STATE.SING) return;
+    const beatsUntilSing = LEAD_IN_BEATS - beatsElapsed;
+    if (beatsUntilSing > 3 || beatsUntilSing < -0.7) return;
+    let label, progress;
+    if (beatsUntilSing > 2)      { label = '3';    progress = 3 - beatsUntilSing; }
+    else if (beatsUntilSing > 1) { label = '2';    progress = 2 - beatsUntilSing; }
+    else if (beatsUntilSing > 0) { label = '1';    progress = 1 - beatsUntilSing; }
+    else                          { label = 'Sing!'; progress = -beatsUntilSing / 0.6; }
+    progress = Math.max(0, Math.min(1, progress));
+    const scale = 1.35 - 0.45 * progress;
+    const alpha = Math.max(0, 1 - progress * (label === 'Sing!' ? 1 : 0.85));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const baseSize = label === 'Sing!' ? 84 : 130;
+    ctx.font = `800 ${Math.round(baseSize * S * scale)}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = label === 'Sing!' ? '#ffd84d' : '#fff';
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 6 * S;
+    const cx = W / 2;
+    const cy = H * 0.42;
+    ctx.strokeText(label, cx, cy);
+    ctx.fillText(label, cx, cy);
+    ctx.restore();
+  };
+
+  const drawPlayhead = () => {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 2 * S;
+    ctx.setLineDash([6 * S, 6 * S]);
+    ctx.beginPath();
+    ctx.moveTo(BIRD_X, 16 * S);
+    ctx.lineTo(BIRD_X, H - GROUND_H - 8 * S);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const drawHud = () => {
+    if (!analyser) return;
+    const note = pitch.hz > 0 ? freqToNote(pitch.hz) : null;
+    const text = note ? note.name : '—';
+    ctx.save();
+    ctx.font = `700 ${Math.round(20 * S)}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = note ? '#fff' : 'rgba(255,255,255,0.55)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 3 * S;
+    ctx.strokeText(text, 18 * S, 62 * S);
+    ctx.fillText(text, 18 * S, 62 * S);
+    // Faint range indicator on the right edge — shows the current pitch
+    // position within the G3–G5 window.
+    const barX = W - 22 * S;
+    const barTop = pitchToY(PITCH_MAX);
+    const barBot = pitchToY(PITCH_MIN);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2 * S;
+    ctx.beginPath();
+    ctx.moveTo(barX, barTop);
+    ctx.lineTo(barX, barBot);
+    ctx.stroke();
+    if (pitch.hz > 0) {
+      const markerY = pitchToY(pitch.hz);
+      ctx.fillStyle = '#ffd84d';
+      ctx.beginPath();
+      ctx.arc(barX, markerY, 5 * S, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+
+  const drawOverlay = (lines) => {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    let y = H * 0.4;
+    for (const l of lines) {
+      ctx.font = `${l.weight || 600} ${Math.round(l.size * S)}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = l.color || '#fff';
+      ctx.fillText(l.text, W / 2, y);
+      y += (l.size + 12) * S;
+    }
+    ctx.restore();
+  };
+
+  const draw = () => {
+    ctx.clearRect(0, 0, W, H);
+
+    // Sun — only over the gradient sky, not over the live camera feed.
+    if (!video.classList.contains('on')) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 220, 170, 0.45)';
+      ctx.beginPath();
+      ctx.arc(W * 0.78, H * 0.22, 50 * S, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    const showPipes = state === STATE.LISTEN || state === STATE.SING || state === STATE.DONE;
+    if (showPipes) {
+      for (const p of computePipes()) drawPipe(p);
+    }
+    if (state === STATE.LISTEN || state === STATE.SING) drawPlayhead();
+    drawGround();
+    drawBird();
+
+    if (state === STATE.LISTEN || state === STATE.SING) drawPhaseBanner();
+    drawCountdown();
+    if (state !== STATE.READY) drawHud();
+
+    if (state === STATE.READY) {
+      drawOverlay([
+        { text: 'Happy Bard', size: 44, weight: 800 },
+        { text: 'Twinkle, Twinkle, Little Star', size: 18, color: 'rgba(255,255,255,0.9)' },
+        { text: 'Tap to start — first you listen, then you sing.', size: 14, color: 'rgba(255,255,255,0.75)' },
+        { text: best > 0 ? `Best: ${best} / ${noteSchedule.length}` : '', size: 13, color: 'rgba(255,255,255,0.6)' },
+      ]);
+    } else if (state === STATE.DONE) {
+      const complete = !diedInPhase && notesPassed === noteSchedule.length;
+      const title = diedInPhase ? 'Oh no!' : (complete ? 'Perfect!' : 'Nice!');
+      drawOverlay([
+        { text: title, size: 44, weight: 800 },
+        { text: `${notesPassed} / ${noteSchedule.length} notes`, size: 20, color: 'rgba(255,255,255,0.92)' },
+        { text: `Best  ${best} / ${noteSchedule.length}`, size: 14, color: 'rgba(255,255,255,0.7)' },
+        { text: 'Tap to retry', size: 14, color: 'rgba(255,255,255,0.65)' },
+      ]);
+    }
+
+    if (flashT > 0) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${flashT * 2})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  };
+
+  const tick = (t) => {
+    if (!lastT) lastT = t;
+    const dt = Math.min(0.05, (t - lastT) / 1000);
+    lastT = t;
+    update(dt);
+    draw();
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
