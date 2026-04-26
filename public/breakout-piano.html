@@ -92,6 +92,42 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  .sound-btn {
+    position: fixed;
+    bottom: 18px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    padding: 0;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    -webkit-tap-highlight-color: transparent;
+    transition: background .15s, border-color .15s, transform .15s, color .15s;
+  }
+  .sound-btn:hover { background: rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.32); }
+  .sound-btn:active { transform: scale(0.94); }
+  .sound-btn svg { display: block; }
+  .sound-btn.muted { color: rgba(255,180,180,0.9); }
+  .sound-btn .icon-muted { display: none; }
+  .sound-btn.muted .icon-on { display: none; }
+  .sound-btn.muted .icon-muted { display: block; }
+  .sound-btn.pulse {
+    animation: soundPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes soundPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 216, 77, 0.0); }
+    50% { box-shadow: 0 0 0 8px rgba(255, 216, 77, 0.15); }
+  }
+
   /* Mobile (any orientation): full-bleed canvas */
   @media (max-width: 1000px) {
     html, body { height: 100dvh; overflow: hidden; }
@@ -136,6 +172,18 @@
   <canvas id="game" width="840" height="600"></canvas>
 </div>
 <audio id="silent-loop" src="/silent.wav" loop preload="auto" playsinline style="display:none"></audio>
+<button id="sound-btn" class="sound-btn pulse" type="button" aria-label="Toggle sound">
+  <svg class="icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+  </svg>
+  <svg class="icon-muted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+    <line x1="23" y1="9" x2="17" y2="15"/>
+    <line x1="17" y1="9" x2="23" y2="15"/>
+  </svg>
+</button>
 <script>
   // Pre-game: on mobile, size the canvas's internal dimensions to match the
   // viewport aspect so CSS stretching doesn't distort the ball (circle) or
@@ -170,8 +218,52 @@
   // switches from "Ambient" (respects mute switch) to "Playback" (ignores
   // it). Both must run inside a user gesture.
   let audio;
+  let masterGain = null;
   const silentEl = document.getElementById('silent-loop');
+  const soundBtn = document.getElementById('sound-btn');
   if (silentEl) silentEl.volume = 0.001;
+  let muted = (() => {
+    try { return localStorage.getItem('breakout-piano-muted') === '1'; }
+    catch { return false; }
+  })();
+  const audioOut = () => masterGain || (audio ? audio.destination : null);
+  const updateSoundIcon = () => {
+    if (!soundBtn) return;
+    soundBtn.classList.toggle('muted', muted);
+    if (audio) soundBtn.classList.remove('pulse');
+    soundBtn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
+  };
+  const setMuted = (m) => {
+    muted = m;
+    try { localStorage.setItem('breakout-piano-muted', m ? '1' : '0'); } catch {}
+    if (masterGain) masterGain.gain.value = m ? 0 : 1;
+    updateSoundIcon();
+  };
+  const playBeep = (freq = 660, dur = 0.12) => {
+    if (!audio) return;
+    const t = audio.currentTime;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain).connect(audioOut());
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  };
+  if (soundBtn) {
+    soundBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      initAudio();              // creates ctx + runs iOS unlock if needed,
+                                // re-runs unlock if the session went stale
+      setMuted(!muted);
+      if (!muted) playBeep();   // positive feedback when turning sound on
+    });
+    updateSoundIcon();
+  }
 
   // ---- Piano soundfont (MusyngKite acoustic_grand_piano) ----
   // Fetch per-pitch MP3 samples on first audio unlock and cache decoded
@@ -214,6 +306,9 @@
       try {
         audio = new (window.AudioContext || window.webkitAudioContext)();
       } catch (e) { return; }
+      masterGain = audio.createGain();
+      masterGain.gain.value = muted ? 0 : 1;
+      masterGain.connect(audio.destination);
       preloadPianoSamples();
     }
     if (audio.state === 'suspended') audio.resume().catch(() => {});
@@ -225,6 +320,7 @@
       src.start(0);
     } catch (e) {}
     if (silentEl && silentEl.paused) silentEl.play().catch(() => {});
+    updateSoundIcon();
   };
 
   const playNote = (noteArg, gainScale = 1) => {
@@ -244,7 +340,7 @@
       src.buffer = pianoBuf;
       const gain = audio.createGain();
       gain.gain.value = 0.75 * gainScale;
-      src.connect(gain).connect(audio.destination);
+      src.connect(gain).connect(audioOut());
       src.start(t);
       return;
     }
@@ -256,7 +352,7 @@
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(0.35 * gainScale, t + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
-    osc.connect(gain).connect(audio.destination);
+    osc.connect(gain).connect(audioOut());
     osc.start(t);
     osc.stop(t + 0.85);
   };
