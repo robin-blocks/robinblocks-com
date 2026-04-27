@@ -264,14 +264,24 @@
   const soundBtn = document.getElementById('sound-btn');
   if (silentEl) silentEl.volume = 0.001;
   let muted = (() => {
-    try { return localStorage.getItem('breakout-piano-muted') === '1'; }
-    catch { return false; }
+    try {
+      const v = localStorage.getItem('breakout-piano-muted');
+      if (v === '1') return true;
+      if (v === '0') return false;
+    } catch {}
+    // First visit on a touch device: default to muted so the pulsing
+    // button visually invites a tap. The unmute click runs playBeep()
+    // through WebAudio inside the user gesture, which is what reliably
+    // flips the iOS audio session out of "Ambient" mode (where the
+    // hardware silent switch mutes everything). Desktop keeps the
+    // previous default of unmuted.
+    return navigator.maxTouchPoints > 0;
   })();
   const audioOut = () => masterGain || (audio ? audio.destination : null);
   const updateSoundIcon = () => {
     if (!soundBtn) return;
     soundBtn.classList.toggle('muted', muted);
-    if (audio) soundBtn.classList.remove('pulse');
+    soundBtn.classList.toggle('pulse', muted);
     soundBtn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
   };
   const setMuted = (m) => {
