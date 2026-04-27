@@ -9,7 +9,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
+    /* --bg / --canvas-bg / --canvas-border are overwritten at runtime
+       by the theme script in <head> with subtle gradients. The solid
+       values here are a maroon fallback if the script fails. */
     --bg: #2a1820;
+    --canvas-bg: #5b2d3d;
+    --canvas-border: #3a1a26;
     --ink: #e8d8cc;
     --ink-2: #c9a89a;
     --ink-3: #8e6a6a;
@@ -81,8 +86,8 @@
     font-weight: 500;
   }
   canvas {
-    background: #5b2d3d;
-    border: 1px solid #3a1a26;
+    background: var(--canvas-bg);
+    border: 1px solid var(--canvas-border);
     border-radius: 10px;
     cursor: none;
     box-shadow: 0 20px 60px -20px rgba(0,0,0,0.55);
@@ -158,6 +163,42 @@
     .back-btn:active { opacity: 1; }
   }
 </style>
+<script>
+  // Pick one of 20 dark color themes at random on page load. Each theme
+  // is [bodyTop, bodyBottom, canvasTop, canvasBottom, border]. The body
+  // and canvas get subtle linear gradients for depth; the border picks
+  // up a slightly darker shade than the canvas to keep edges grounded.
+  // Runs in <head> so the variables are set before the first paint.
+  (() => {
+    const T = [
+      ['#2a1820','#170c12','#5b2d3d','#3e1d2a','#3a1a26'], // maroon
+      ['#2a0f18','#16060c','#571a30','#3a0e20','#2e0a18'], // burgundy
+      ['#0e1f1a','#050f0c','#1f4438','#122b22','#0e2218'], // forest
+      ['#0c1a18','#050f0e','#18403a','#0e2a26','#0a201c'], // pine
+      ['#0f1a2e','#050b18','#1e3258','#122040','#0a1a30'], // midnight
+      ['#10122e','#060818','#232861','#161a3f','#0e1226'], // indigo
+      ['#1d1024','#0e0612','#421f50','#2c1238','#1f0a26'], // plum
+      ['#1a0e1f','#0c0510','#3c1e44','#28122e','#1a0820'], // aubergine
+      ['#1d0e1a','#0e0610','#46193e','#2f0c2a','#1c0820'], // mulberry
+      ['#1f1410','#100a08','#422a22','#2c1a14','#1c0e0a'], // mocha
+      ['#1a100a','#0d0805','#3a2418','#251408','#160c06'], // espresso
+      ['#1a0f08','#0d0805','#3a2014','#261308','#160a05'], // cocoa
+      ['#22120a','#100804','#4f2510','#321806','#1c0c04'], // rust
+      ['#1a1c0e','#0d0e06','#383a18','#23260e','#15170a'], // olive
+      ['#16161a','#08080c','#2a2a32','#1a1a22','#101014'], // charcoal
+      ['#13181f','#07090e','#283042','#161e2c','#0c1320'], // slate
+      ['#0a141a','#040b10','#173044','#0d1f2c','#061218'], // petrol
+      ['#0a1c20','#04101a','#154048','#0c282e','#06161a'], // teal abyss
+      ['#0a1620','#040c14','#163448','#0c1f2c','#061018'], // deep ocean
+      ['#0c0e16','#04060c','#1a2030','#0e1220','#06080e'], // onyx blue
+    ];
+    const t = T[Math.floor(Math.random() * T.length)];
+    const r = document.documentElement.style;
+    r.setProperty('--bg',            `linear-gradient(160deg, ${t[0]} 0%, ${t[1]} 100%)`);
+    r.setProperty('--canvas-bg',     `linear-gradient(180deg, ${t[2]} 0%, ${t[3]} 100%)`);
+    r.setProperty('--canvas-border', t[4]);
+  })();
+</script>
 </head>
 <body>
 <div class="topbar">
