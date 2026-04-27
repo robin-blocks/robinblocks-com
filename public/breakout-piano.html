@@ -436,6 +436,135 @@
     return null;
   };
 
+  // ---- Key signatures (for the "key" power-up) ----
+  // 24 major + minor keys, weighted by how common each is in real music so
+  // common keys (C, G, Am) drop more often than exotic ones (F#, D#m).
+  // Each key carries the diatonic pcSet (fast block-membership test) and an
+  // ordered accidentals list (drawn at the start of staff lines).
+  const SHARP_ORDER = ['F#','C#','G#','D#','A#','E#','B#'];
+  const FLAT_ORDER  = ['Bb','Eb','Ab','Db','Gb','Cb','Fb'];
+  const MAJOR_INTERVALS = [0,2,4,5,7,9,11];
+  const MINOR_INTERVALS = [0,2,3,5,7,8,10]; // natural minor
+  const KEY_DEFS = [
+    // [name, mode, tonicPc, sigCount (>0 sharps, <0 flats), prefersFlats, weight]
+    ['C',   'maj',  0,  0, false, 10],
+    ['G',   'maj',  7,  1, false,  9],
+    ['D',   'maj',  2,  2, false,  8],
+    ['A',   'maj',  9,  3, false,  7],
+    ['E',   'maj',  4,  4, false,  6],
+    ['B',   'maj', 11,  5, false,  2],
+    ['F#',  'maj',  6,  6, false,  1],
+    ['F',   'maj',  5, -1, true,   8],
+    ['Bb',  'maj', 10, -2, true,   5],
+    ['Eb',  'maj',  3, -3, true,   4],
+    ['Ab',  'maj',  8, -4, true,   3],
+    ['Db',  'maj',  1, -5, true,   1],
+    ['Am',  'min',  9,  0, false,  8],
+    ['Em',  'min',  4,  1, false,  6],
+    ['Bm',  'min', 11,  2, false,  5],
+    ['F#m', 'min',  6,  3, false,  3],
+    ['C#m', 'min',  1,  4, false,  3],
+    ['G#m', 'min',  8,  5, false,  1],
+    ['D#m', 'min',  3,  6, false,  1],
+    ['Dm',  'min',  2, -1, true,   6],
+    ['Gm',  'min',  7, -2, true,   3],
+    ['Cm',  'min',  0, -3, true,   2],
+    ['Fm',  'min',  5, -4, true,   1],
+    ['Bbm', 'min', 10, -5, true,   1],
+  ];
+  const KEYS_TABLE = KEY_DEFS.map(([name, mode, tonicPc, sigCount, prefersFlats, weight]) => {
+    const intervals = mode === 'maj' ? MAJOR_INTERVALS : MINOR_INTERVALS;
+    const pcSet = new Set(intervals.map(i => (tonicPc + i) % 12));
+    const accNames = sigCount > 0 ? SHARP_ORDER.slice(0, sigCount)
+                   : sigCount < 0 ? FLAT_ORDER.slice(0, -sigCount)
+                   : [];
+    const accidentals = accNames.map(n => ({ letter: n[0], acc: n.length > 1 ? n.slice(1) : '' }));
+    return { name, displayName: name, mode, tonicPc, sigCount, accidentals, pcSet, prefersFlats, weight };
+  });
+  const TOTAL_KEY_WEIGHT = KEYS_TABLE.reduce((s, k) => s + k.weight, 0);
+  const weightedPickKey = () => {
+    let r = Math.random() * TOTAL_KEY_WEIGHT;
+    for (const k of KEYS_TABLE) {
+      r -= k.weight;
+      if (r <= 0) return k;
+    }
+    return KEYS_TABLE[0];
+  };
+  const isBlockInKey = (note, key) => key.pcSet.has(pitchClass(note));
+
+  // ---- Note re-spelling for key-aware staff rendering ----
+  // Block notes are stored with sharps only (e.g. 'D#5'), so in flat keys we
+  // re-spell at render time: a played D# in Bb major becomes Eb (no glyph,
+  // since Eb is in the key sig). Audio playback is unaffected — only display.
+  const LETTER_PC  = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  const ACC_SEMI   = { '': 0, '#': 1, 'b': -1 };
+  const PC_TO_LETTERS = {
+    0:  [{letter:'C',acc:''}, {letter:'B',acc:'#'}],
+    1:  [{letter:'C',acc:'#'}, {letter:'D',acc:'b'}],
+    2:  [{letter:'D',acc:''}],
+    3:  [{letter:'E',acc:'b'}, {letter:'D',acc:'#'}],
+    4:  [{letter:'E',acc:''}, {letter:'F',acc:'b'}],
+    5:  [{letter:'F',acc:''}, {letter:'E',acc:'#'}],
+    6:  [{letter:'F',acc:'#'}, {letter:'G',acc:'b'}],
+    7:  [{letter:'G',acc:''}],
+    8:  [{letter:'A',acc:'b'}, {letter:'G',acc:'#'}],
+    9:  [{letter:'A',acc:''}],
+    10: [{letter:'B',acc:'b'}, {letter:'A',acc:'#'}],
+    11: [{letter:'B',acc:''}, {letter:'C',acc:'b'}],
+  };
+  // Spell a pitch class in the context of `key`. Returns letter + accidental
+  // (in the spelling) and the glyph that should be drawn next to the notehead
+  // ('' = covered by the key sig, '♮' = cancels a sig accidental, '♯'/'♭' =
+  // chromatic alteration).
+  const spellInKey = (pc, key) => {
+    const sigMap = {};
+    if (key) for (const a of key.accidentals) sigMap[a.letter] = a.acc;
+    const cands = PC_TO_LETTERS[pc] || [];
+    // 1. spelling that matches the key signature directly (no glyph needed)
+    for (const c of cands) {
+      const sigAcc = sigMap[c.letter] || '';
+      if (c.acc === sigAcc) return { letter: c.letter, acc: c.acc, glyph: '' };
+    }
+    // 2. natural that cancels a sig accidental on the same letter (♮)
+    for (const c of cands) {
+      if (c.acc === '' && sigMap[c.letter]) {
+        return { letter: c.letter, acc: '', glyph: '♮' };
+      }
+    }
+    // 3. key's preferred chromatic spelling (♯ for sharp keys, ♭ for flat)
+    const prefAcc = (key && key.prefersFlats) ? 'b' : '#';
+    for (const c of cands) {
+      if (c.acc !== prefAcc) continue;
+      const sigAcc = sigMap[c.letter] || '';
+      if (sigAcc && sigAcc !== c.acc) continue; // would need a double accidental
+      return { letter: c.letter, acc: c.acc, glyph: c.acc === '#' ? '♯' : '♭' };
+    }
+    // 4. any sharp/flat that doesn't conflict with the sig
+    for (const c of cands) {
+      if (c.acc !== '#' && c.acc !== 'b') continue;
+      const sigAcc = sigMap[c.letter] || '';
+      if (sigAcc && sigAcc !== c.acc) continue;
+      return { letter: c.letter, acc: c.acc, glyph: c.acc === '#' ? '♯' : '♭' };
+    }
+    // 5. fallback: first natural
+    for (const c of cands) if (c.acc === '') return { letter: c.letter, acc: '', glyph: '' };
+    return { letter: 'C', acc: '', glyph: '' };
+  };
+  const noteToMidi = (note) => {
+    const m = note.match(/([A-G]#?)(\d)/);
+    return SEMI[m[1]] + (parseInt(m[2]) - 4) * 12 + 69;
+  };
+  // Re-spell a stored note ('D#5') in the active key, returning the staff-
+  // rendering quadruple. Octave can shift across enharmonic respelling
+  // (C5 ↔ B#4, B4 ↔ Cb5, F4 ↔ E#4, E4 ↔ Fb4).
+  const respellNoteForKey = (note, key) => {
+    const midi = noteToMidi(note);
+    const pc = ((midi % 12) + 12) % 12;
+    const { letter, acc, glyph } = spellInKey(pc, key);
+    const oct = (midi - LETTER_PC[letter] - ACC_SEMI[acc] - 60) / 12 + 4;
+    return { letter, acc, oct, glyph };
+  };
+
   // ---- Keyboard layout ----
   // Grid: each white key spans 4 sub-columns; each black key spans 2 sub-columns
   // straddling the boundary between two whites. In the lower region (below the
@@ -553,9 +682,12 @@
   const CHORD_WINDOW_MS = 350;
   const CHORD_COOLDOWN_MS = 200;
   const CHORD_BONUS_MULT = 10;
-  const TOKEN_DROP_CHANCE = 0.08;   // ~1 in 12 blocks drops a token
+  const TOKEN_DROP_CHANCE = 0.08;   // ~1 in 12 blocks drops a "+2 balls"
+  const KEY_TOKEN_DROP_CHANCE = 0.05; // separate roll for a key power-up
+  const MAX_TOKENS_IN_FLIGHT = 3;
   const TOKEN_SPEED = 2.8;           // px/frame, slow so paddle can catch
-  const TOKEN_W = 26, TOKEN_H = 16;  // capsule dimensions
+  const TOKEN_W = 26, TOKEN_H = 16;  // capsule dimensions for "+2 balls"
+  const KEY_TOKEN_W = 38, KEY_TOKEN_H = 18; // wider capsule for key labels (e.g. "F#m")
   const TOKEN_EXTRA_BALLS = 2;
   const MAX_BALLS = 5;
 
@@ -570,7 +702,7 @@
   let chordCooldownUntil = 0, chordFlashUntil = 0;
   const recentHits = new Map(); // pitchClass -> last hit time
   const floatingTexts = [];
-  const tokens = []; // { x, y, vy } — "+2 balls" drops rising toward paddle
+  const tokens = []; // { kind: 'extraBalls' | 'key', key?, x, y, vy, spawnedAt }
 
   // Musical composition — every destroyed key is recorded; on win the
   // whole sequence plays back with gaps clamped into a musical range.
@@ -581,6 +713,14 @@
   let playbackUntil = 0; // timestamp when playback ends (0 = not playing)
   let playbackIndex = -1; // absolute composition index of the currently-playing note
 
+  // Active key signature, set by the "key" power-up. While non-null, blocks
+  // whose pitch class isn't in key.pcSet are inert (ball bounces, no destroy).
+  let currentKey = null;
+  // Key changes recorded into the composition timeline; { atCompIdx, key }.
+  // atCompIdx = -1 means "before the first note". buildScore reads this to
+  // emit a new bar with the key signature at each transition.
+  const keyChanges = [];
+
   const launchBall = () => {
     balls.push({
       x: paddle.x + paddle.w / 2,
@@ -589,6 +729,26 @@
       vy: BALL_SPEED * 0.9,
       r: BALL_R,
     });
+  };
+
+  // Activate a key signature: blocks not in the key become inert, and the
+  // staff opens a new bar with the key signature drawn after the clef. The
+  // key persists until another key power-up replaces it or the level resets.
+  const applyKeyPowerUp = (key) => {
+    currentKey = key;
+    keyChanges.push({ atCompIdx: composition.length - 1, key });
+    floatingTexts.push({
+      text: 'Key: ' + key.displayName,
+      x: paddle.x + paddle.w / 2,
+      y: paddle.y + paddle.h + 24,
+      startTime: performance.now(),
+    });
+    // Tonic triad confirmation: tonic + (major or minor) third + fifth
+    const third = key.mode === 'maj' ? 4 : 3;
+    const oct = 5;
+    playNote(PC_NAMES[key.tonicPc] + oct, 0.45);
+    playNote(PC_NAMES[(key.tonicPc + third) % 12] + oct, 0.4);
+    playNote(PC_NAMES[(key.tonicPc + 7) % 12] + oct, 0.4);
   };
 
   const resetGame = () => {
@@ -609,6 +769,8 @@
     tokens.length = 0;
     composition.length = 0;
     lifeLossAfter.length = 0;
+    keyChanges.length = 0;
+    currentKey = null;
     compositionStart = 0;
     playbackGen++; // cancels any pending playback timeouts
     playbackUntil = 0;
@@ -766,6 +928,13 @@
         if (a > bestA) { bestA = a; best = b; }
       }
       if (best) {
+        // Inert under an active key signature: bounce off without breaking,
+        // no sound, no score, no composition push, no token drop. Multiplier
+        // is preserved (free deflection — see plan).
+        if (currentKey && !isBlockInKey(best.note, currentKey)) {
+          resolveBounce(ball, best);
+          continue;
+        }
         best.alive = false;
         best.flash = 1;
         playNote(best.note);
@@ -773,10 +942,28 @@
         multiplier = Math.min(MAX_MULT, multiplier + 1);
         if (multiplier > peakMultiplier) peakMultiplier = multiplier;
 
-        // Power-up drop: rare chance a block drops a "+2 balls" capsule
-        // that rises toward the paddle. Cap 2 in flight so cascades don't spam.
-        if (tokens.length < 2 && balls.length < MAX_BALLS && Math.random() < TOKEN_DROP_CHANCE) {
+        // Power-up drops: separate rolls for "+2 balls" and "key" capsules.
+        // Both rise toward the paddle; total in-flight cap prevents spam.
+        // The "+2 balls" roll only fires when there's room for more balls.
+        let dropped = false;
+        if (tokens.length < MAX_TOKENS_IN_FLIGHT
+            && balls.length < MAX_BALLS
+            && Math.random() < TOKEN_DROP_CHANCE) {
           tokens.push({
+            kind: 'extraBalls',
+            x: best.x + best.w / 2,
+            y: best.y + best.h / 2,
+            vy: -TOKEN_SPEED,
+            spawnedAt: performance.now(),
+          });
+          dropped = true;
+        }
+        if (!dropped
+            && tokens.length < MAX_TOKENS_IN_FLIGHT
+            && Math.random() < KEY_TOKEN_DROP_CHANCE) {
+          tokens.push({
+            kind: 'key',
+            key: weightedPickKey(),
             x: best.x + best.w / 2,
             y: best.y + best.h / 2,
             vy: -TOKEN_SPEED,
@@ -827,39 +1014,45 @@
     for (let i = tokens.length - 1; i >= 0; i--) {
       const tk = tokens[i];
       tk.y += tk.vy;
+      const tw = tk.kind === 'key' ? KEY_TOKEN_W : TOKEN_W;
+      const th = tk.kind === 'key' ? KEY_TOKEN_H : TOKEN_H;
       // Paddle catch — overlap with paddle rect
-      if (tk.y - TOKEN_H / 2 < paddle.y + paddle.h &&
-          tk.y + TOKEN_H / 2 > paddle.y &&
-          tk.x + TOKEN_W / 2 > paddle.x &&
-          tk.x - TOKEN_W / 2 < paddle.x + paddle.w) {
+      if (tk.y - th / 2 < paddle.y + paddle.h &&
+          tk.y + th / 2 > paddle.y &&
+          tk.x + tw / 2 > paddle.x &&
+          tk.x - tw / 2 < paddle.x + paddle.w) {
         tokens.splice(i, 1);
-        // Add extra balls, up to cap, split from an existing ball if any
-        const source = balls[0];
-        const spawnX = source ? source.x : paddle.x + paddle.w / 2;
-        const spawnY = source ? source.y : paddle.y + paddle.h + BALL_R + 2;
-        const baseSpeed = source ? Math.hypot(source.vx, source.vy) : BALL_SPEED;
-        for (let k = 0; k < TOKEN_EXTRA_BALLS && balls.length < MAX_BALLS; k++) {
-          const angle = (Math.random() - 0.5) * (Math.PI / 2); // spread ±45°
-          balls.push({
-            x: spawnX,
-            y: spawnY,
-            vx: Math.sin(angle) * baseSpeed,
-            vy: Math.cos(angle) * baseSpeed * (source ? Math.sign(source.vy) || 1 : 1),
-            r: BALL_R,
+        if (tk.kind === 'key') {
+          applyKeyPowerUp(tk.key);
+        } else {
+          // Add extra balls, up to cap, split from an existing ball if any
+          const source = balls[0];
+          const spawnX = source ? source.x : paddle.x + paddle.w / 2;
+          const spawnY = source ? source.y : paddle.y + paddle.h + BALL_R + 2;
+          const baseSpeed = source ? Math.hypot(source.vx, source.vy) : BALL_SPEED;
+          for (let k = 0; k < TOKEN_EXTRA_BALLS && balls.length < MAX_BALLS; k++) {
+            const angle = (Math.random() - 0.5) * (Math.PI / 2); // spread ±45°
+            balls.push({
+              x: spawnX,
+              y: spawnY,
+              vx: Math.sin(angle) * baseSpeed,
+              vy: Math.cos(angle) * baseSpeed * (source ? Math.sign(source.vy) || 1 : 1),
+              r: BALL_R,
+            });
+          }
+          // Pleasant confirmation tone
+          playNote('C6', 0.5);
+          floatingTexts.push({
+            text: '+2 balls',
+            x: paddle.x + paddle.w / 2,
+            y: paddle.y + paddle.h + 24,
+            startTime: performance.now(),
           });
         }
-        // Pleasant confirmation tone
-        playNote('C6', 0.5);
-        floatingTexts.push({
-          text: '+2 balls',
-          x: paddle.x + paddle.w / 2,
-          y: paddle.y + paddle.h + 24,
-          startTime: performance.now(),
-        });
         continue;
       }
       // Off-screen: past the top (tokens rise in this inverted layout)
-      if (tk.y + TOKEN_H / 2 < 0) tokens.splice(i, 1);
+      if (tk.y + th / 2 < 0) tokens.splice(i, 1);
     }
 
     // Paddle shrink at half cleared
@@ -873,7 +1066,13 @@
       }
     }
 
-    if (!won && blocks.every(b => !b.alive)) {
+    // Win when every block is either destroyed or inert under the active
+    // key. Without this, a restrictive key power-up would lock out the win
+    // (the player can't break out-of-key blocks).
+    const winnable = blocks.every(b =>
+      !b.alive || (currentKey && !isBlockInKey(b.note, currentKey))
+    );
+    if (!won && winnable) {
       won = true;
       playComposition();
     } else if (!gameOver && lives === 0 && balls.length === 0) {
@@ -930,23 +1129,28 @@
   const drawSlice = (b) => {
     const alpha = b.alive ? 1 : Math.max(0, b.flash);
     if (!b.alive && alpha <= 0) return;
-    ctx.globalAlpha = alpha;
+    // Inert when an active key signature excludes this block's pitch class.
+    // Dimmed palette + reduced alpha makes it obvious the ball will bounce.
+    const inert = b.alive && currentKey && !isBlockInKey(b.note, currentKey);
+    ctx.globalAlpha = inert ? alpha * 0.45 : alpha;
     if (b.black) {
       const g = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
-      g.addColorStop(0, '#2a2a2a'); g.addColorStop(1, '#000');
+      if (inert) { g.addColorStop(0, '#3a3a3a'); g.addColorStop(1, '#1a1a1a'); }
+      else       { g.addColorStop(0, '#2a2a2a'); g.addColorStop(1, '#000'); }
       ctx.fillStyle = g;
       ctx.fillRect(b.x, b.y, b.w, b.h);
       ctx.strokeStyle = 'rgba(255,255,255,0.06)';
       ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
     } else {
       const g = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
-      g.addColorStop(0, '#fafafa'); g.addColorStop(1, '#dcdcdc');
+      if (inert) { g.addColorStop(0, '#9a9a9a'); g.addColorStop(1, '#7a7a7a'); }
+      else       { g.addColorStop(0, '#fafafa'); g.addColorStop(1, '#dcdcdc'); }
       ctx.fillStyle = g;
       ctx.fillRect(b.x, b.y, b.w, b.h);
       ctx.strokeStyle = 'rgba(0,0,0,0.22)';
       ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
       if (b.isBottom) {
-        ctx.fillStyle = '#888';
+        ctx.fillStyle = inert ? '#555' : '#888';
         ctx.font = '11px -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(b.note, b.x + b.w / 2, b.y + b.h - 8);
@@ -984,7 +1188,6 @@
 
   const buildScore = () => {
     const els = [];
-    if (composition.length === 0) return { els, totalBars: 0 };
     let bar = 0, pos = 0;
     const advance = (d) => {
       pos += d;
@@ -995,11 +1198,39 @@
     for (const idx of lifeLossAfter) {
       restsAfter.set(idx, (restsAfter.get(idx) || 0) + 1);
     }
+    // Key changes after each composition index. -1 = before any note.
+    const keyChangeAfter = new Map();
+    for (const kc of keyChanges) {
+      keyChangeAfter.set(kc.atCompIdx, kc.key);
+    }
+    let activeKey = null;
     const placeCrotchetRest = () => {
       const dur = pos + 2 > QUAVERS_PER_BAR ? 1 : 2; // downgrade at bar edge
       els.push({ type: 'rest', bar, pos, dur });
       advance(dur);
     };
+    const placeQuaverRest = () => {
+      els.push({ type: 'rest', bar, pos, dur: 1 });
+      advance(1);
+    };
+    // Pad with rests until pos === 0 (next bar boundary). Used when a key
+    // change forces the next bar to start clean with the new key signature.
+    const flushToBarEnd = () => {
+      while (pos > 0) {
+        if (pos + 2 <= QUAVERS_PER_BAR) placeCrotchetRest();
+        else placeQuaverRest();
+      }
+    };
+    // Key change before any note (compIdx === -1): sets the opening key sig
+    // and emits a keysig marker at bar 0.
+    if (keyChangeAfter.has(-1)) {
+      activeKey = keyChangeAfter.get(-1);
+      els.push({ type: 'keysig', bar: 0, key: activeKey });
+    }
+    if (composition.length === 0) {
+      const totalBars = bar + (pos > 0 ? 1 : 0);
+      return { els, totalBars: Math.max(totalBars, 1), openingKey: activeKey };
+    }
     for (let i = 0; i < composition.length; i++) {
       const c = composition[i];
       const rawGapMs = i < composition.length - 1
@@ -1008,13 +1239,19 @@
       const rawGapQ = rawGapMs / QUAVER_MS;
       let noteDur = rawGapQ <= 1 ? 1 : 2;
       if (noteDur === 2 && pos + 2 > QUAVERS_PER_BAR) noteDur = 1; // downgrade at bar edge
-      els.push({ type: 'note', bar, pos, dur: noteDur, compIdx: i, note: c.note });
+      els.push({ type: 'note', bar, pos, dur: noteDur, compIdx: i, note: c.note, keyAtTime: activeKey });
       advance(noteDur);
       const lossCount = restsAfter.get(i) || 0;
       for (let r = 0; r < lossCount; r++) placeCrotchetRest();
+      // Key change after this note: flush to next bar, set new key, mark it.
+      if (keyChangeAfter.has(i)) {
+        flushToBarEnd();
+        activeKey = keyChangeAfter.get(i);
+        els.push({ type: 'keysig', bar, key: activeKey });
+      }
     }
     const totalBars = bar + (pos > 0 ? 1 : 0);
-    return { els, totalBars: Math.max(totalBars, 1) };
+    return { els, totalBars: Math.max(totalBars, 1), openingKey: null };
   };
 
   // Convert our internal 1/2-quaver durations to the {1,2,4,8,16} semiquaver
@@ -1038,14 +1275,33 @@
     const BARS_PER_LINE = maxLineW > 500 ? 3 : 2;
     const LINE_QUAVERS = BARS_PER_LINE * QUAVERS_PER_BAR;
     const BAR_START_PAD = 14; // breathing room between bar line (or clef) and first note slot
-    const contentOffset = clefW + timeSigW;
-    const pxPerQuaver = (maxLineW - contentOffset - BARS_PER_LINE * BAR_START_PAD) / LINE_QUAVERS;
-    const pxPerBar = BAR_START_PAD + QUAVERS_PER_BAR * pxPerQuaver;
     const staffW = maxLineW;
     const staffX = (W - staffW) / 2;
 
     const { els, totalBars } = buildScore();
     const totalLines = Math.max(1, Math.ceil(totalBars / BARS_PER_LINE));
+
+    // Key signature lookup: walk the keysig markers and return the key in
+    // force at the start of any given bar (null if none).
+    const sortedKeysigs = els.filter(e => e.type === 'keysig').sort((a, b) => a.bar - b.bar);
+    const keyForBar = (barIdx) => {
+      let k = null;
+      for (const e of sortedKeysigs) {
+        if (e.bar > barIdx) break;
+        k = e.key;
+      }
+      return k;
+    };
+    // Reserve horizontal space for the widest key signature in the score so
+    // pxPerQuaver stays uniform across all lines (small padding loss vs.
+    // per-line layout drift). Key sigs only appear at line starts in v1;
+    // mid-line key changes flow to the next line break.
+    const maxAccidentals = sortedKeysigs.reduce((m, e) => Math.max(m, e.key.accidentals.length), 0);
+    const KEYSIG_GLYPH_W = SS * 1.1;
+    const keySigW = maxAccidentals > 0 ? maxAccidentals * KEYSIG_GLYPH_W + 4 : 0;
+    const contentOffset = clefW + timeSigW + keySigW;
+    const pxPerQuaver = (maxLineW - contentOffset - BARS_PER_LINE * BAR_START_PAD) / LINE_QUAVERS;
+    const pxPerBar = BAR_START_PAD + QUAVERS_PER_BAR * pxPerQuaver;
 
     // Quick lookup: composition index → element (for playback highlight)
     const elByCompIdx = new Map();
@@ -1073,7 +1329,8 @@
     const yForStep = (step, y0) => y0 + (8 - step) * (SS / 2);
 
     // ---------- helpers ----------
-    const drawNoteHead = (x, y, step, isSharp, semiqCode, ink, scale = 1, stemOverride = null, skipFlag = false) => {
+    // accidentalGlyph: '' (none, covered by key sig), '♯', '♭', or '♮'
+    const drawNoteHead = (x, y, step, accidentalGlyph, semiqCode, ink, scale = 1, stemOverride = null, skipFlag = false) => {
       // Ledger lines
       if (step <= -2) {
         ctx.strokeStyle = ink;
@@ -1093,12 +1350,14 @@
         ctx.lineTo(x + headW * 0.8, ly2);
         ctx.stroke();
       }
-      if (isSharp) {
+      if (accidentalGlyph) {
         ctx.fillStyle = ink;
         ctx.font = `${SS * 1.8}px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('♯', x - headW - 2, y);
+        // Flats sit slightly closer to the notehead than sharps/naturals
+        const ax = accidentalGlyph === '♭' ? x - headW - 1 : x - headW - 2;
+        ctx.fillText(accidentalGlyph, ax, y);
       }
       // Head — filled for crotchet/quaver, open for semibreve (centred whole-bar notes only)
       const filled = semiqCode <= 4;
@@ -1203,6 +1462,29 @@
         ctx.fillText('4', staffX + clefW + timeSigW / 2, y0 + SS * 3);
       }
 
+      // Key signature for this line (drawn between time sig and first bar).
+      // Sharp order positions (steps from E4 staff bottom): F#5=8, C#5=5,
+      // G#5=9, D#5=6, A#4=3, E#5=7, B#4=4. Flat order: Bb4=4, Eb5=7, Ab4=3,
+      // Db5=6, Gb4=2, Cb5=5, Fb4=1.
+      const lineStartBar = lineIdx * BARS_PER_LINE;
+      const lineKey = keyForBar(lineStartBar);
+      if (lineKey && lineKey.accidentals.length > 0) {
+        const SHARP_STEPS = { F:8, C:5, G:9, D:6, A:3, E:7, B:4 };
+        const FLAT_STEPS  = { B:4, E:7, A:3, D:6, G:2, C:5, F:1 };
+        const stepMap = lineKey.accidentals[0].acc === '#' ? SHARP_STEPS : FLAT_STEPS;
+        const glyph = lineKey.accidentals[0].acc === '#' ? '♯' : '♭';
+        ctx.fillStyle = `rgba(255, 220, 200, ${0.7 * dim})`;
+        ctx.font = `${SS * 2.0}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const ksX0 = staffX + clefW + timeSigW + KEYSIG_GLYPH_W / 2;
+        for (let i = 0; i < lineKey.accidentals.length; i++) {
+          const a = lineKey.accidentals[i];
+          const step = stepMap[a.letter];
+          ctx.fillText(glyph, ksX0 + i * KEYSIG_GLYPH_W, yForStep(step, y0));
+        }
+      }
+
       // Bar lines
       ctx.strokeStyle = faintInk;
       ctx.lineWidth = 1;
@@ -1214,12 +1496,21 @@
         ctx.stroke();
       }
 
-      const lineStartBar = lineIdx * BARS_PER_LINE;
       for (let b = 0; b < BARS_PER_LINE; b++) {
         const barIdx = lineStartBar + b;
         if (barIdx >= totalBars) break;
         const barX = contentStart + b * pxPerBar;
         const barEls = els.filter((e) => e.bar === barIdx);
+
+        // Pre-compute the key-aware spelling for each note element so we
+        // can reuse it for both beam-direction and notehead drawing.
+        const spellByEl = new Map();
+        for (const e of barEls) {
+          if (e.type !== 'note') continue;
+          const sp = respellNoteForKey(e.note, e.keyAtTime);
+          sp.step = DIATONIC[sp.letter] + (sp.oct - 4) * 7 - 2;
+          spellByEl.set(e, sp);
+        }
 
         // Beam detection: per 4/4 beat (pos pairs 0-1, 2-3, 4-5, 6-7),
         // a pair of adjacent quaver notes beams together.
@@ -1233,7 +1524,7 @@
           const e2 = barEls.find((e) => e.pos === p2 && e.type === 'note' && e.dur === 1);
           if (e1 && e2) {
             // Force both stems same direction based on average pitch
-            const avg = (staffStep(e1.note) + staffStep(e2.note)) / 2;
+            const avg = (spellByEl.get(e1).step + spellByEl.get(e2).step) / 2;
             const up = avg <= 4;
             beamPairs.push({ e1, e2, up });
             beamedSet.add(e1);
@@ -1247,24 +1538,24 @@
         for (const e of barEls) {
           const x = barX + e.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
           if (e.type === 'note') {
-            const step = staffStep(e.note);
-            const isSharp = e.note.replace(/\d/g, '').length === 2;
+            const sp = spellByEl.get(e);
             const stemDir = stemDirMap.has(e) ? stemDirMap.get(e) : null;
             drawNoteHead(
-              x, yForStep(step, y0), step, isSharp,
+              x, yForStep(sp.step, y0), sp.step, sp.glyph,
               toSemiqCode(e.dur, false), ink, 1, stemDir, beamedSet.has(e)
             );
-          } else {
+          } else if (e.type === 'rest') {
             drawRest(x, y0, toSemiqCode(e.dur, false), ink);
           }
+          // 'keysig' elements are handled at line start; nothing per-bar.
         }
 
         // Draw beams on top of stems
         for (const { e1, e2, up } of beamPairs) {
           const x1 = barX + e1.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
           const x2 = barX + e2.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
-          const y1 = yForStep(staffStep(e1.note), y0);
-          const y2 = yForStep(staffStep(e2.note), y0);
+          const y1 = yForStep(spellByEl.get(e1).step, y0);
+          const y2 = yForStep(spellByEl.get(e2).step, y0);
           const tip1 = up ? y1 - stemLen : y1 + stemLen;
           const tip2 = up ? y2 - stemLen : y2 + stemLen;
           const stemX1 = up ? x1 + headW / 2 - 0.5 : x1 - headW / 2 + 0.5;
@@ -1293,16 +1584,16 @@
           const barX = contentStart + barWithinLine * pxPerBar;
           const x = barX + activeEl.pos * pxPerQuaver + BAR_START_PAD + Math.min(pxPerQuaver * 0.15, 3);
           const n = composition[playbackIndex];
-          const step = staffStep(n.note);
+          const sp = respellNoteForKey(n.note, activeEl.keyAtTime);
+          const step = DIATONIC[sp.letter] + (sp.oct - 4) * 7 - 2;
           const y = yForStep(step, y0);
-          const isSharp = n.note.replace(/\d/g, '').length === 2;
 
           ctx.fillStyle = 'rgba(255, 215, 100, 0.35)';
           ctx.beginPath();
           ctx.arc(x, y, headW * 1.2, 0, Math.PI * 2);
           ctx.fill();
 
-          drawNoteHead(x, y, step, isSharp, toSemiqCode(activeEl.dur, false), 'rgba(255, 215, 100, 1)', 1.3);
+          drawNoteHead(x, y, step, sp.glyph, toSemiqCode(activeEl.dur, false), 'rgba(255, 215, 100, 1)', 1.3);
         }
       }
     }
@@ -1365,25 +1656,31 @@
       drawBall(paddle.x + paddle.w / 2, paddle.y + paddle.h + BALL_R + 2);
     }
 
-    // Power-up tokens ("+2") rising toward paddle
+    // Power-up tokens rising toward paddle. Two kinds:
+    //   'extraBalls' — green capsule labelled "+2"
+    //   'key'        — amber capsule labelled with the key name (e.g. "Cm")
     for (const tk of tokens) {
       const pulse = 0.8 + 0.2 * Math.sin((now - tk.spawnedAt) / 120);
-      // Capsule
-      ctx.fillStyle = `rgba(110, 230, 180, ${pulse})`;
+      const isKey = tk.kind === 'key';
+      const tw = isKey ? KEY_TOKEN_W : TOKEN_W;
+      const th = isKey ? KEY_TOKEN_H : TOKEN_H;
+      ctx.fillStyle = isKey
+        ? `rgba(255, 198, 92, ${pulse})`
+        : `rgba(110, 230, 180, ${pulse})`;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.lineWidth = 1;
-      const x = tk.x - TOKEN_W / 2, y = tk.y - TOKEN_H / 2;
+      const x = tk.x - tw / 2, y = tk.y - th / 2;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x, y, TOKEN_W, TOKEN_H, 8);
-      else ctx.rect(x, y, TOKEN_W, TOKEN_H);
+      if (ctx.roundRect) ctx.roundRect(x, y, tw, th, 8);
+      else ctx.rect(x, y, tw, th);
       ctx.fill();
       ctx.stroke();
       // Label
-      ctx.fillStyle = '#0e3a2a';
-      ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = isKey ? '#3d2a08' : '#0e3a2a';
+      ctx.font = `bold ${isKey ? 12 : 11}px -apple-system, system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('+2', tk.x, tk.y + 0.5);
+      ctx.fillText(isKey ? tk.key.displayName : '+2', tk.x, tk.y + 0.5);
     }
 
     // Lives hearts (top-right, leftmost = life #1)
