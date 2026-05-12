@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Piano Train · Robin Blocks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b1426;
+    --sky-top: #4a90c2;
+    --sky-bot: #8fc3df;
+    --ink: #f0f4fa;
+    --ink-2: #b6c2d8;
+    --ink-3: #7d8aa3;
+    --chrome: rgba(255,255,255,0.08);
+    --chrome-hover: rgba(255,255,255,0.16);
+    --chrome-border: rgba(255,255,255,0.12);
+    --accent: #ffd23a;
+    --hit: #6fdc8c;
+    --miss: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: var(--ink);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+    touch-action: none;
+  }
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .topbar > * { pointer-events: auto; }
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    color: var(--ink);
+    background: var(--chrome);
+    border: 1px solid var(--chrome-border);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .15s;
+    backdrop-filter: blur(8px);
+  }
+  .back-btn:hover {
+    background: var(--chrome-hover);
+    border-color: rgba(255,255,255,0.22);
+  }
+  .back-btn:active { transform: translateY(1px); }
+  .brand {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    letter-spacing: -0.01em;
+  }
+  .brand b { color: var(--ink); font-weight: 700; }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  #canvas { display: block; width: 100%; height: 100%; }
+
+  .hud {
+    position: fixed;
+    top: 60px; left: 22px;
+    z-index: 5;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    pointer-events: none;
+  }
+  .lives {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--chrome);
+    border: 1px solid var(--chrome-border);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+  }
+  .heart {
+    width: 16px; height: 16px;
+    border-radius: 3px;
+    background: var(--miss);
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2);
+    transition: opacity .2s, transform .3s;
+  }
+  .heart.gone {
+    opacity: 0.18;
+    background: var(--ink-3);
+    transform: scale(.85);
+  }
+
+  .score-hud {
+    padding: 8px 12px;
+    background: var(--chrome);
+    border: 1px solid var(--chrome-border);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+    font-size: 13px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .score-hud b { color: var(--ink); font-weight: 700; }
+
+  .coin-hud {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    background: linear-gradient(180deg, rgba(255, 220, 90, 0.18), rgba(120, 80, 0, 0.18));
+    border: 1.5px solid rgba(255, 210, 58, 0.5);
+    border-radius: 14px;
+    backdrop-filter: blur(8px);
+    font-size: 16px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 4px 20px -6px rgba(255, 200, 30, 0.35);
+  }
+  .coin-hud .coin-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #fff5b8, #ffd23a 55%, #a87410);
+    box-shadow:
+      0 0 10px rgba(255, 210, 58, 0.7),
+      inset 0 -2px 0 rgba(120, 80, 0, 0.35);
+    border: 1.5px solid #7a5108;
+    flex-shrink: 0;
+  }
+  .coin-hud b {
+    font-weight: 800;
+    font-size: 28px;
+    line-height: 1;
+    color: #ffe785;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.4), 0 0 12px rgba(255, 210, 58, 0.45);
+    min-width: 1.2em;
+    text-align: right;
+    display: inline-block;
+  }
+  .coin-hud .best {
+    margin-left: 4px;
+    padding-left: 10px;
+    border-left: 1px solid rgba(255, 220, 90, 0.3);
+    font-size: 11px;
+    color: var(--ink-3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .coin-hud .best #coin-best { font-size: 14px; color: var(--ink-2); font-weight: 700; }
+
+  @keyframes coin-pop {
+    0%   { transform: scale(1); color: #ffe785; }
+    30%  { transform: scale(1.55); color: #fff; text-shadow: 0 0 22px rgba(255, 230, 130, 1); }
+    100% { transform: scale(1); color: #ffe785; }
+  }
+  .coin-hud.popped b { animation: coin-pop .42s ease-out; }
+  @keyframes coin-icon-spin {
+    0%   { transform: rotateY(0deg) scale(1); }
+    50%  { transform: rotateY(180deg) scale(1.25); }
+    100% { transform: rotateY(360deg) scale(1); }
+  }
+  .coin-hud.popped .coin-icon { animation: coin-icon-spin .42s ease-out; }
+
+  /* Coin sparkle: small particle that bursts at the play line on collection. */
+  @keyframes coin-sparkle {
+    0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+    100% { transform: translate(-50%, -160%) scale(1.5); opacity: 0; }
+  }
+  .coin-sparkle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 12;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #fff8c8, #ffd23a 50%, transparent 75%);
+    box-shadow: 0 0 18px 4px rgba(255, 220, 100, 0.7);
+    animation: coin-sparkle .6s ease-out forwards;
+  }
+  .coin-sparkle .plus {
+    position: absolute;
+    top: -4px; left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-weight: 800;
+    font-size: 18px;
+    text-shadow: 0 0 8px rgba(255, 200, 30, 0.9), 0 1px 0 rgba(0,0,0,0.3);
+  }
+
+  .progress {
+    position: fixed;
+    top: 60px; right: 22px;
+    z-index: 5;
+    width: 220px;
+    height: 8px;
+    background: var(--chrome);
+    border: 1px solid var(--chrome-border);
+    border-radius: 999px;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--hit));
+    transition: width .12s linear;
+  }
+
+  .keyhint {
+    display: none; /* superseded by the 3D keys at the play line */
+  }
+  .key {
+    position: absolute;
+    bottom: 0;
+    width: 64px;
+    height: 64px;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, #fafaf6 0%, #d9d9d2 100%);
+    border: 1px solid #6a6258;
+    border-radius: 9px;
+    box-shadow:
+      0 4px 0 #4a423a,
+      0 7px 10px rgba(0,0,0,0.45),
+      inset 0 1px 0 rgba(255,255,255,0.7),
+      inset 0 -2px 0 rgba(0,0,0,0.10);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #2a2620;
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    transition: transform .07s, box-shadow .07s, background .12s;
+  }
+  .key .letter {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #1a1612;
+    line-height: 1;
+  }
+  .key .finger {
+    font-size: 10px;
+    font-weight: 500;
+    color: #7a7368;
+    margin-top: 3px;
+    line-height: 1;
+  }
+  .key.active, .key:active {
+    transform: translateX(-50%) translateY(3px);
+    box-shadow:
+      0 1px 0 #4a423a,
+      0 2px 4px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.55);
+    background: linear-gradient(180deg, #ffe27a 0%, #ffb733 100%);
+  }
+  .key.hit {
+    background: linear-gradient(180deg, #b8f5c8 0%, #5dd47e 100%);
+    box-shadow:
+      0 1px 0 #2a6b3a,
+      0 2px 4px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.55);
+    transform: translateX(-50%) translateY(3px);
+  }
+  .key.miss {
+    background: linear-gradient(180deg, #ffb8b8 0%, #ff6b6b 100%);
+    box-shadow:
+      0 1px 0 #802a2a,
+      0 2px 4px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.55);
+    transform: translateX(-50%) translateY(3px);
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 14, 28, 0.6);
+    backdrop-filter: blur(10px);
+    transition: opacity .2s;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: rgba(18, 28, 50, 0.85);
+    border: 1px solid var(--chrome-border);
+    border-radius: 18px;
+    padding: 32px 36px;
+    max-width: 460px;
+    width: calc(100% - 40px);
+    text-align: center;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.5);
+  }
+  .panel h1 {
+    margin: 0 0 4px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .panel .sub {
+    margin: 0 0 18px;
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .panel .instructions {
+    text-align: left;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid var(--chrome-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: 0 0 18px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    line-height: 1.55;
+  }
+  .panel .instructions b { color: var(--ink); }
+  .panel .instructions kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    margin: 0 1px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--chrome-border);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .panel button {
+    display: inline-block;
+    padding: 12px 28px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    background: var(--accent);
+    color: #2a1a00;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform .1s, filter .15s;
+  }
+  .panel button:hover { filter: brightness(1.05); }
+  .panel button:active { transform: translateY(1px); }
+  .panel .stats {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    margin: 0 0 18px;
+    font-variant-numeric: tabular-nums;
+  }
+  .panel .stat {
+    background: rgba(0,0,0,0.18);
+    border: 1px solid var(--chrome-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 92px;
+  }
+  .panel .stat .v {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .panel .stat .k {
+    font-size: 11px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+  }
+
+  .toast {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 30;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid var(--chrome-border);
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .25s, transform .35s;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 8px));
+  }
+
+  /* Red vignette that pulses briefly when the player loses a life. */
+  .flash-red {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center,
+                                rgba(220, 30, 30, 0) 35%,
+                                rgba(180, 10, 10, 0.7) 95%);
+    opacity: 0;
+  }
+  @keyframes life-flash {
+    0%   { opacity: 0; }
+    12%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .flash-red.active { animation: life-flash 0.42s ease-out; }
+
+  @media (max-width: 600px) {
+    .topbar { padding: 8px 10px; }
+    .hud { top: 52px; left: 10px; gap: 8px; }
+    .progress { top: 52px; right: 10px; width: 130px; }
+    .key { width: 50px; height: 50px; }
+    .key .letter { font-size: 18px; }
+    .key .finger { font-size: 9px; }
+    .keyhint { bottom: 10px; height: 60px; }
+    .panel { padding: 24px 22px; }
+    .panel h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="back-btn" href="/" aria-label="Back to home">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <span>Back</span>
+  </a>
+  <div class="brand"><b>Piano Train</b> · robinblocks.com</div>
+</div>
+
+<div id="stage">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="hud">
+  <div class="lives" id="lives">
+    <span class="heart"></span><span class="heart"></span><span class="heart"></span>
+  </div>
+  <div class="score-hud"><b id="hit-count">0</b> / <span id="total-count">0</span></div>
+  <div class="coin-hud"><span class="coin-icon"></span><b id="coin-count">0</b><span class="best">best <span id="coin-best">0</span></span></div>
+</div>
+
+<div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+
+<div class="keyhint" id="keyhint">
+  <div class="key" data-code="KeyB"><span class="letter">B</span><span class="finger">1·thumb</span></div>
+  <div class="key" data-code="KeyU"><span class="letter">U</span><span class="finger">2·index</span></div>
+  <div class="key" data-code="KeyI"><span class="letter">I</span><span class="finger">3·middle</span></div>
+  <div class="key" data-code="KeyO"><span class="letter">O</span><span class="finger">4·ring</span></div>
+  <div class="key" data-code="KeyP"><span class="letter">P</span><span class="finger">5·pinky</span></div>
+</div>
+
+<div class="overlay" id="start-overlay">
+  <div class="panel">
+    <h1>Piano Train</h1>
+    <p class="sub">Play Mozart's Sonata Facile (K545) with your right hand — no piano required.</p>
+    <div class="instructions">
+      <p><b>Five keys, five fingers:</b><br/>
+      <kbd>B</kbd> thumb · <kbd>U</kbd> index · <kbd>I</kbd> middle · <kbd>O</kbd> ring · <kbd>P</kbd> pinky</p>
+      <p>Trains roll down five tracks toward you. When one reaches the line, press the key for that lane to hit it — the right note plays automatically.</p>
+      <p>Wrong key or missed timing costs a life. You get <b>three lives</b>.</p>
+    </div>
+    <button id="start-btn">Start playing</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="end-overlay">
+  <div class="panel">
+    <h1 id="end-title">Complete!</h1>
+    <p class="sub" id="end-sub">Nice work.</p>
+    <div class="stats">
+      <div class="stat"><div class="v" id="end-hit">0</div><div class="k">Hit</div></div>
+      <div class="stat"><div class="v" id="end-acc">0%</div><div class="k">Accuracy</div></div>
+      <div class="stat"><div class="v" id="end-coins">0</div><div class="k" id="end-coins-label">Coins</div></div>
+    </div>
+    <button id="replay-btn">Play again</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="flash-red" id="flash-red"></div>
+<audio class="ow-audio" src="/assets/ow1.wav" preload="auto"></audio>
+<audio class="ow-audio" src="/assets/ow2.mp3" preload="auto"></audio>
+<audio class="ow-audio" src="/assets/ow3.wav" preload="auto"></audio>
+<audio class="whack-audio" src="/assets/whack1.mp3" preload="auto"></audio>
+<audio class="whack-audio" src="/assets/whack2.mp3" preload="auto"></audio>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// =========================================================================
+// Score: Mozart Sonata K545, mvt 1, opening (hand-transcribed, ~12 bars).
+// v1 placeholder until the MXL → JSON build pipeline is wired up. Times are
+// in beats; we convert to seconds at startup using metadata.tempo_bpm.
+// =========================================================================
+const SCORE = {
+  metadata: {
+    title: "Mozart Sonata K545, mvt 1 (opening)",
+    composer: "W. A. Mozart",
+    tempo_bpm: 61,
+    time_signature: [4, 4],
+  },
+  // Extracted from sonata-no16-in-c-major-k545.mid (first 64 beats).
+  // Finger assignment is heuristic (pitch-class → lane), not pianist-grade.
+  rh_notes: [
+    { beat: 0.0000, midi: 72, dur: 1.8979, finger: 1 },  // C5
+    { beat: 2.0000, midi: 76, dur: 0.9479, finger: 3 },  // E5
+    { beat: 3.0000, midi: 79, dur: 0.9479, finger: 5 },  // G5
+    { beat: 4.0000, midi: 71, dur: 1.4979, finger: 4 },  // B4
+    { beat: 5.5000, midi: 72, dur: 0.2479, finger: 1 },  // C5
+    { beat: 5.7500, midi: 74, dur: 0.2479, finger: 2 },  // D5
+    { beat: 6.0000, midi: 72, dur: 0.9479, finger: 1 },  // C5
+    { beat: 8.0000, midi: 81, dur: 1.8979, finger: 4 },  // A5
+    { beat: 10.0000, midi: 79, dur: 0.9479, finger: 5 },  // G5
+    { beat: 11.0000, midi: 84, dur: 0.9479, finger: 1 },  // C6
+    { beat: 12.0000, midi: 79, dur: 0.9479, finger: 5 },  // G5
+    { beat: 13.0000, midi: 77, dur: 0.7479, finger: 4 },  // F5
+    { beat: 13.7500, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 14.0000, midi: 76, dur: 0.9479, finger: 3 },  // E5
+    { beat: 16.0000, midi: 69, dur: 0.4729, finger: 4 },  // A4
+    { beat: 16.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 16.7500, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 17.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 17.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 17.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 17.7500, midi: 79, dur: 0.2354, finger: 5 },  // G5
+    { beat: 18.0000, midi: 81, dur: 0.2354, finger: 4 },  // A5
+    { beat: 18.2500, midi: 79, dur: 0.2354, finger: 5 },  // G5
+    { beat: 18.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 18.7500, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 19.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 19.2500, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 19.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 19.7500, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 20.0000, midi: 67, dur: 0.4729, finger: 5 },  // G4
+    { beat: 20.5000, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 20.7500, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 21.0000, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 21.2500, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 21.5000, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 21.7500, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 22.0000, midi: 79, dur: 0.2354, finger: 5 },  // G5
+    { beat: 22.2500, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 22.5000, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 22.7500, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 23.0000, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 23.2500, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 23.5000, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 23.7500, midi: 67, dur: 0.2354, finger: 5 },  // G4
+    { beat: 24.0000, midi: 65, dur: 0.4729, finger: 4 },  // F4
+    { beat: 24.5000, midi: 67, dur: 0.2354, finger: 5 },  // G4
+    { beat: 24.7500, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 25.0000, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 25.2500, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 25.5000, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 25.7500, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 26.0000, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 26.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 26.5000, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 26.7500, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 27.0000, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 27.2500, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 27.5000, midi: 67, dur: 0.2354, finger: 5 },  // G4
+    { beat: 27.7500, midi: 65, dur: 0.2354, finger: 4 },  // F4
+    { beat: 28.0000, midi: 64, dur: 0.4729, finger: 3 },  // E4
+    { beat: 28.5000, midi: 65, dur: 0.2354, finger: 4 },  // F4
+    { beat: 28.7500, midi: 67, dur: 0.2354, finger: 5 },  // G4
+    { beat: 29.0000, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 29.2500, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 29.5000, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 29.7500, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 30.0000, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 30.2500, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 30.5000, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 30.7500, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 31.0000, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 31.2500, midi: 67, dur: 0.2354, finger: 5 },  // G4
+    { beat: 31.5000, midi: 65, dur: 0.2354, finger: 4 },  // F4
+    { beat: 31.7500, midi: 64, dur: 0.2354, finger: 3 },  // E4
+    { beat: 32.0000, midi: 62, dur: 0.4729, finger: 2 },  // D4
+    { beat: 32.5000, midi: 64, dur: 0.2354, finger: 3 },  // E4
+    { beat: 32.7500, midi: 65, dur: 0.2354, finger: 4 },  // F4
+    { beat: 33.0000, midi: 67, dur: 0.2354, finger: 5 },  // G4
+    { beat: 33.2500, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 33.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 33.7500, midi: 73, dur: 0.2354, finger: 1 },  // C#5
+    { beat: 34.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 34.2500, midi: 69, dur: 0.2354, finger: 4 },  // A4
+    { beat: 34.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
+    { beat: 34.7500, midi: 73, dur: 0.2354, finger: 1 },  // C#5
+    { beat: 35.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 35.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 35.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 35.7500, midi: 79, dur: 0.2354, finger: 5 },  // G5
+    { beat: 36.0000, midi: 81, dur: 0.2354, finger: 4 },  // A5
+    { beat: 36.2500, midi: 83, dur: 0.2354, finger: 4 },  // B5
+    { beat: 36.5000, midi: 84, dur: 0.2354, finger: 1 },  // C6
+    { beat: 36.7500, midi: 83, dur: 0.2354, finger: 4 },  // B5
+    { beat: 37.0000, midi: 81, dur: 0.2354, finger: 4 },  // A5
+    { beat: 37.2500, midi: 79, dur: 0.2354, finger: 5 },  // G5
+    { beat: 37.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 37.7500, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 38.0000, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 38.2500, midi: 79, dur: 0.2354, finger: 5 },  // G5
+    { beat: 38.5000, midi: 81, dur: 0.2354, finger: 4 },  // A5
+    { beat: 38.7500, midi: 79, dur: 0.2354, finger: 5 },  // G5
+    { beat: 39.0000, midi: 77, dur: 0.2354, finger: 4 },  // F5
+    { beat: 39.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
+    { beat: 39.5000, midi: 74, dur: 0.2354, finger: 2 },  // D5
+    { beat: 39.7500, midi: 72, dur: 0.2354, finger: 1 },  // C5
+    { beat: 40.0000, midi: 71, dur: 0.4729, finger: 4 },  // B4
+    { beat: 40.5000, midi: 79, dur: 0.4729, finger: 5 },  // G5
+    { beat: 41.0000, midi: 76, dur: 0.4729, finger: 3 },  // E5
+    { beat: 41.5000, midi: 72, dur: 0.4729, finger: 1 },  // C5
+    { beat: 42.0000, midi: 74, dur: 0.4729, finger: 2 },  // D5
+    { beat: 42.5000, midi: 79, dur: 0.4729, finger: 5 },  // G5
+    { beat: 43.0000, midi: 76, dur: 0.4729, finger: 3 },  // E5
+    { beat: 43.5000, midi: 72, dur: 0.4729, finger: 1 },  // C5
+    { beat: 44.0000, midi: 74, dur: 0.9479, finger: 2 },  // D5
+    { beat: 45.0000, midi: 71, dur: 0.9479, finger: 4 },  // B4
+    { beat: 46.0000, midi: 67, dur: 0.9479, finger: 5 },  // G4
+    { beat: 52.0000, midi: 86, dur: 0.4979, finger: 2 },  // D6
+    { beat: 52.5000, midi: 83, dur: 0.4729, finger: 4 },  // B5
+    { beat: 53.0000, midi: 79, dur: 1.4979, finger: 5 },  // G5
+    { beat: 54.5000, midi: 81, dur: 0.2479, finger: 4 },  // A5
+    { beat: 54.7500, midi: 83, dur: 0.2479, finger: 4 },  // B5
+    { beat: 55.0000, midi: 81, dur: 0.4729, finger: 4 },  // A5
+    { beat: 55.5000, midi: 79, dur: 0.2479, finger: 5 },  // G5
+    { beat: 56.0000, midi: 79, dur: 0.9854, finger: 5 },  // G5
+    { beat: 57.0000, midi: 78, dur: 0.9479, finger: 4 },  // F#5
+    { beat: 60.0000, midi: 86, dur: 0.4979, finger: 2 },  // D6
+    { beat: 60.5000, midi: 83, dur: 0.4729, finger: 4 },  // B5
+    { beat: 61.0000, midi: 79, dur: 1.4979, finger: 5 },  // G5
+    { beat: 62.5000, midi: 81, dur: 0.2479, finger: 4 },  // A5
+    { beat: 62.7500, midi: 83, dur: 0.2479, finger: 4 },  // B5
+    { beat: 63.0000, midi: 81, dur: 0.4729, finger: 4 },  // A5
+    { beat: 63.5000, midi: 79, dur: 0.2479, finger: 5 },  // G5
+  ],
+  lh_notes: [
+    { beat: 0.0000, midi: 60, dur: 0.4729 },  // C4
+    { beat: 0.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 1.0000, midi: 64, dur: 0.4729 },  // E4
+    { beat: 1.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 2.0000, midi: 60, dur: 0.4729 },  // C4
+    { beat: 2.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 3.0000, midi: 64, dur: 0.4729 },  // E4
+    { beat: 3.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 4.0000, midi: 62, dur: 0.4729 },  // D4
+    { beat: 4.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 5.0000, midi: 65, dur: 0.4729 },  // F4
+    { beat: 5.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 6.0000, midi: 60, dur: 0.4729 },  // C4
+    { beat: 6.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 7.0000, midi: 64, dur: 0.4729 },  // E4
+    { beat: 7.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 8.0000, midi: 60, dur: 0.4729 },  // C4
+    { beat: 8.5000, midi: 69, dur: 0.4729 },  // A4
+    { beat: 9.0000, midi: 65, dur: 0.4729 },  // F4
+    { beat: 9.5000, midi: 69, dur: 0.4729 },  // A4
+    { beat: 10.0000, midi: 60, dur: 0.4729 },  // C4
+    { beat: 10.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 11.0000, midi: 64, dur: 0.4729 },  // E4
+    { beat: 11.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 12.0000, midi: 59, dur: 0.4729 },  // B3
+    { beat: 12.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 13.0000, midi: 62, dur: 0.4729 },  // D4
+    { beat: 13.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 14.0000, midi: 60, dur: 0.4729 },  // C4
+    { beat: 14.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 15.0000, midi: 64, dur: 0.4729 },  // E4
+    { beat: 15.5000, midi: 67, dur: 0.4729 },  // G4
+    { beat: 16.0000, midi: 65, dur: 0.9479 },  // F4
+    { beat: 19.0000, midi: 53, dur: 0.9479 },  // F3
+    { beat: 19.0000, midi: 60, dur: 0.9479 },  // C4
+    { beat: 20.0000, midi: 52, dur: 0.9479 },  // E3
+    { beat: 20.0000, midi: 60, dur: 0.9479 },  // C4
+    { beat: 23.0000, midi: 52, dur: 0.9479 },  // E3
+    { beat: 23.0000, midi: 60, dur: 0.9479 },  // C4
+    { beat: 24.0000, midi: 50, dur: 0.9479 },  // D3
+    { beat: 24.0000, midi: 60, dur: 0.9479 },  // C4
+    { beat: 27.0000, midi: 50, dur: 0.9479 },  // D3
+    { beat: 27.0000, midi: 59, dur: 0.9479 },  // B3
+    { beat: 28.0000, midi: 48, dur: 0.9479 },  // C3
+    { beat: 28.0000, midi: 60, dur: 0.9479 },  // C4
+    { beat: 31.0000, midi: 48, dur: 0.9479 },  // C3
+    { beat: 31.0000, midi: 52, dur: 0.9479 },  // E3
+    { beat: 32.0000, midi: 53, dur: 3.7979 },  // F3
+    { beat: 32.0000, midi: 57, dur: 3.7979 },  // A3
+    { beat: 36.0000, midi: 53, dur: 1.4229 },  // F3
+    { beat: 37.5000, midi: 55, dur: 0.4729 },  // G3
+    { beat: 38.0000, midi: 57, dur: 1.4229 },  // A3
+    { beat: 39.5000, midi: 54, dur: 0.4729 },  // F#3
+    { beat: 40.0000, midi: 43, dur: 0.2354 },  // G2
+    { beat: 40.2500, midi: 47, dur: 0.2354 },  // B2
+    { beat: 40.5000, midi: 50, dur: 0.2354 },  // D3
+    { beat: 40.7500, midi: 55, dur: 0.2354 },  // G3
+    { beat: 41.0000, midi: 43, dur: 0.2354 },  // G2
+    { beat: 41.2500, midi: 48, dur: 0.2354 },  // C3
+    { beat: 41.5000, midi: 52, dur: 0.2354 },  // E3
+    { beat: 41.7500, midi: 55, dur: 0.2354 },  // G3
+    { beat: 42.0000, midi: 43, dur: 0.2354 },  // G2
+    { beat: 42.2500, midi: 47, dur: 0.2354 },  // B2
+    { beat: 42.5000, midi: 50, dur: 0.2354 },  // D3
+    { beat: 42.7500, midi: 55, dur: 0.2354 },  // G3
+    { beat: 43.0000, midi: 43, dur: 0.2354 },  // G2
+    { beat: 43.2500, midi: 48, dur: 0.2354 },  // C3
+    { beat: 43.5000, midi: 52, dur: 0.2354 },  // E3
+    { beat: 43.7500, midi: 55, dur: 0.2354 },  // G3
+    { beat: 44.0000, midi: 43, dur: 0.9479 },  // G2
+    { beat: 45.0000, midi: 55, dur: 0.9479 },  // G3
+    { beat: 46.0000, midi: 43, dur: 0.9479 },  // G2
+    { beat: 48.0000, midi: 61, dur: 0.2354 },  // C#4
+    { beat: 48.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 48.5000, midi: 61, dur: 0.2354 },  // C#4
+    { beat: 48.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 49.0000, midi: 61, dur: 0.2354 },  // C#4
+    { beat: 49.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 49.5000, midi: 61, dur: 0.2354 },  // C#4
+    { beat: 49.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 50.0000, midi: 60, dur: 0.2354 },  // C4
+    { beat: 50.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 50.5000, midi: 60, dur: 0.2354 },  // C4
+    { beat: 50.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 51.0000, midi: 60, dur: 0.2354 },  // C4
+    { beat: 51.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 51.5000, midi: 60, dur: 0.2354 },  // C4
+    { beat: 51.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 52.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 52.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 52.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 52.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 53.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 53.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 53.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 53.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 54.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 54.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 54.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 54.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 55.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 55.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 55.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 55.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 56.0000, midi: 60, dur: 0.2354 },  // C4
+    { beat: 56.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 56.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 56.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 57.0000, midi: 57, dur: 0.2354 },  // A3
+    { beat: 57.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 57.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 57.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 58.0000, midi: 60, dur: 0.2354 },  // C4
+    { beat: 58.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 58.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 58.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 59.0000, midi: 60, dur: 0.2354 },  // C4
+    { beat: 59.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 59.5000, midi: 57, dur: 0.2354 },  // A3
+    { beat: 59.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 60.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 60.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 60.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 60.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 61.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 61.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 61.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 61.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 62.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 62.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 62.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 62.7500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 63.0000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 63.2500, midi: 62, dur: 0.2354 },  // D4
+    { beat: 63.5000, midi: 59, dur: 0.2354 },  // B3
+    { beat: 63.7500, midi: 62, dur: 0.2354 },  // D4
+  ],
+};
+
+// Convert beats to seconds. Shift the whole piece by COUNT_IN_BEATS so the
+// player gets a steady metronomic count-in (and four warmup coins) before the
+// music starts.
+const SEC_PER_BEAT = 60 / SCORE.metadata.tempo_bpm;
+const COUNT_IN_BEATS = 4;
+SCORE.rh_notes.forEach(n => { n.beat += COUNT_IN_BEATS; });
+SCORE.lh_notes.forEach(n => { n.beat += COUNT_IN_BEATS; });
+SCORE.rh_notes.forEach(n => { n.time = n.beat * SEC_PER_BEAT; n.duration = n.dur * SEC_PER_BEAT; });
+SCORE.lh_notes.forEach(n => { n.time = n.beat * SEC_PER_BEAT; n.duration = n.dur * SEC_PER_BEAT; });
+SCORE.totalDuration = Math.max(
+  ...SCORE.rh_notes.map(n => n.time + n.duration),
+  ...SCORE.lh_notes.map(n => n.time + n.duration),
+);
+
+// =========================================================================
+// Music helpers
+// =========================================================================
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+function midiToName(midi) {
+  return NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+
+// =========================================================================
+// Input mapping
+// =========================================================================
+const KEY_TO_FINGER = {
+  'KeyB': 1,
+  'KeyU': 2,
+  'KeyI': 3,
+  'KeyO': 4,
+  'KeyP': 5,
+};
+const FINGER_TO_CODE = { 1: 'KeyB', 2: 'KeyU', 3: 'KeyI', 4: 'KeyO', 5: 'KeyP' };
+const LANE_X = { 1: -2.4, 2: -1.2, 3: 0, 4: 1.2, 5: 2.4 }; // lane x positions
+
+// =========================================================================
+// Audio: Salamander Grand Piano via smplr (lazy-loaded from CDN).
+// =========================================================================
+const Audio = {
+  ctx: null,
+  piano: null,
+  stoppers: new Map(),    // key -> stopper function returned by piano.start()
+  loaded: false,
+  loadingPromise: null,
+  init() {
+    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  },
+  resume() {
+    if (this.ctx && this.ctx.state === 'suspended') return this.ctx.resume();
+  },
+  loadPiano() {
+    if (this.loadingPromise) return this.loadingPromise;
+    this.init();
+    this.loadingPromise = (async () => {
+      const mod = await import('https://esm.sh/smplr@0.16.1');
+      this.piano = new mod.SplendidGrandPiano(this.ctx);
+      // smplr exposes the readiness promise as `.load` (newer) or `.loaded()` (older).
+      const ready = this.piano.load || (this.piano.loaded && this.piano.loaded());
+      if (ready && typeof ready.then === 'function') await ready;
+      this.loaded = true;
+    })().catch(err => {
+      console.error('Piano failed to load:', err);
+      this.loadingPromise = null;
+      throw err;
+    });
+    return this.loadingPromise;
+  },
+  // Held note: stops when noteOff(key) is called.
+  noteOn(midi, key, velocity = 0.85) {
+    if (!this.loaded || !this.piano) return;
+    const prev = this.stoppers.get(key);
+    if (prev) { try { prev(); } catch (e) {} }
+    const vel = Math.max(1, Math.min(127, Math.round(velocity * 100)));
+    console.log(`[piano] noteOn ${midiToName(midi)} (midi ${midi}) vel=${vel} src=${key}`);
+    const stopper = this.piano.start({ note: midi, velocity: vel });
+    if (typeof stopper === 'function') this.stoppers.set(key, stopper);
+  },
+  noteOff(key) {
+    const stopper = this.stoppers.get(key);
+    if (!stopper) return;
+    this.stoppers.delete(key);
+    try { stopper(); } catch (e) {}
+  },
+  // Fire-and-forget note with fixed duration (used by LH auto-play).
+  playFor(midi, duration, velocity = 0.6) {
+    if (!this.loaded || !this.piano) return;
+    const vel = Math.max(1, Math.min(127, Math.round(velocity * 100)));
+    console.log(`[piano] playFor ${midiToName(midi)} (midi ${midi}) dur=${duration.toFixed(2)}s vel=${vel}`);
+    this.piano.start({ note: midi, velocity: vel, duration });
+  },
+};
+
+// =========================================================================
+// Three.js scene
+// =========================================================================
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x6fb2d8);
+scene.fog = new THREE.Fog(0x6fb2d8, 18, 42);
+
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 100);
+camera.position.set(0, 3.0, 9.5);
+camera.lookAt(0, 0.4, -2);
+
+// --- Lighting ---
+const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.0);
+sun.position.set(6, 14, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.left = -12;
+sun.shadow.camera.right = 12;
+sun.shadow.camera.top = 16;
+sun.shadow.camera.bottom = -16;
+scene.add(sun);
+
+// --- Ground / lanes ---
+const PLAY_Z = 4.5;       // play line z position (close to camera)
+const SPAWN_Z = -28;      // trains spawn here
+const LANE_WIDTH = 1.2;
+
+// Scenery and sleepers scroll past at this rate so it feels like the camera is
+// tracking forward with the character. Trains move at TRAIN_SPEED (faster), so
+// they still visibly approach and overtake the character.
+const SCROLL_SPEED = 7.5;
+const SCROLL_WRAP_NEAR = 12;   // once past z=12 the scroller has left the camera
+const SCROLL_WRAP_FAR = -38;   // wrap to this z (just past SPAWN_Z) to reappear at the horizon
+const scrollers = [];          // meshes to advance each frame
+function addScroller(mesh) { scrollers.push(mesh); }
+
+const groundGeo = new THREE.BoxGeometry(40, 0.6, 80);
+const groundMat = new THREE.MeshLambertMaterial({ color: 0x7ec46a });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.position.set(0, -0.4, -20);
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Lane stripes (slightly darker, alternating tones)
+for (let i = 1; i <= 5; i++) {
+  const isAlt = (i % 2 === 0);
+  const laneGeo = new THREE.BoxGeometry(LANE_WIDTH - 0.05, 0.05, 70);
+  const laneMat = new THREE.MeshLambertMaterial({ color: isAlt ? 0x4e6f6a : 0x3e5c58 });
+  const lane = new THREE.Mesh(laneGeo, laneMat);
+  lane.position.set(LANE_X[i], -0.07, -28);
+  lane.receiveShadow = true;
+  scene.add(lane);
+  // Sleepers (railroad ties) — scroll past with the world so they read as
+  // moving under the runner.
+  for (let z = SCROLL_WRAP_FAR; z <= SCROLL_WRAP_NEAR; z += 1.6) {
+    const tieGeo = new THREE.BoxGeometry(LANE_WIDTH - 0.15, 0.08, 0.25);
+    const tieMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2a });
+    const tie = new THREE.Mesh(tieGeo, tieMat);
+    tie.position.set(LANE_X[i], -0.03, z);
+    scene.add(tie);
+    addScroller(tie);
+  }
+  // Rails — two thin strips per lane
+  for (const off of [-0.32, 0.32]) {
+    const railGeo = new THREE.BoxGeometry(0.08, 0.06, 70);
+    const railMat = new THREE.MeshLambertMaterial({ color: 0x999999 });
+    const rail = new THREE.Mesh(railGeo, railMat);
+    rail.position.set(LANE_X[i] + off, 0.02, -28);
+    scene.add(rail);
+  }
+}
+
+// --- Play line marker ---
+// Ground stripe (where train front edges visually "land").
+const playLineGeo = new THREE.BoxGeometry(6.5, 0.04, 0.15);
+const playLineMat = new THREE.MeshBasicMaterial({ color: 0xffd23a });
+const playLine = new THREE.Mesh(playLineGeo, playLineMat);
+playLine.position.set(0, 0.06, PLAY_Z);
+scene.add(playLine);
+// Vertical "gate" at body height so the timing line is visible against the
+// approaching trains, not just down at ground level.
+const gateGeo = new THREE.BoxGeometry(6.5, 1.0, 0.06);
+const gateMat = new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.28 });
+const gate = new THREE.Mesh(gateGeo, gateMat);
+gate.position.set(0, 0.55, PLAY_Z);
+scene.add(gate);
+// Top beam connecting the gate posts — a more solid line at body height.
+const beamGeo = new THREE.BoxGeometry(6.5, 0.08, 0.12);
+const beamMat = new THREE.MeshBasicMaterial({ color: 0xffd23a });
+const beam = new THREE.Mesh(beamGeo, beamMat);
+beam.position.set(0, 1.0, PLAY_Z);
+scene.add(beam);
+
+// 3D keys at the play line — one per track. The top face has the keyboard
+// letter and finger label drawn via a canvas texture, so the labels read in
+// perspective as the camera angles down on them.
+const KEY_LETTERS = { 1: 'B', 2: 'U', 3: 'I', 4: 'O', 5: 'P' };
+const KEY_FINGER_NAMES = { 1: 'thumb', 2: 'index', 3: 'middle', 4: 'ring', 5: 'pinky' };
+
+function makeKeyTopTexture(letter, fingerName) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 320; // taller canvas → letter reads correctly when stretched across the rectangular top face
+  const ctx = c.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, c.height);
+  grad.addColorStop(0, '#fafaf6');
+  grad.addColorStop(1, '#dcdcd2');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, c.width, c.height);
+  // Subtle border to look like an inset keycap
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(6, 6, c.width - 12, c.height - 12);
+  // Big keyboard letter
+  ctx.fillStyle = '#1a1612';
+  ctx.font = 'bold 180px -apple-system, BlinkMacSystemFont, system-ui, Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(letter, c.width / 2, c.height / 2 - 20);
+  // Finger label
+  ctx.font = '600 36px -apple-system, BlinkMacSystemFont, system-ui, Inter, sans-serif';
+  ctx.fillStyle = '#7a7368';
+  ctx.fillText(fingerName, c.width / 2, c.height - 60);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const pads = {};
+const KEY_BODY_H = 0.10;
+const KEY_BODY_W = LANE_WIDTH - 0.18;
+const KEY_BODY_D = 0.95;
+for (let i = 1; i <= 5; i++) {
+  const sideMat = new THREE.MeshLambertMaterial({ color: 0x3a322a });
+  const bottomMat = new THREE.MeshLambertMaterial({ color: 0x1f1a14 });
+  const topMat = new THREE.MeshLambertMaterial({
+    map: makeKeyTopTexture(KEY_LETTERS[i], KEY_FINGER_NAMES[i]),
+    emissive: 0x000000,
+  });
+  // BoxGeometry material order: +X, -X, +Y (top), -Y, +Z, -Z
+  const materials = [sideMat, sideMat, topMat, bottomMat, sideMat, sideMat];
+  const padGeo = new THREE.BoxGeometry(KEY_BODY_W, KEY_BODY_H, KEY_BODY_D);
+  const pad = new THREE.Mesh(padGeo, materials);
+  pad.position.set(LANE_X[i], KEY_BODY_H / 2 + 0.01, PLAY_Z);
+  pad.receiveShadow = true;
+  pad.castShadow = true;
+  scene.add(pad);
+  pads[i] = pad;
+}
+
+// --- Player character (blocky voxel figure) ---
+// The character is locked to z = PLAY_Z so they're always inside the yellow
+// play-zone gate. Leaps are gravity-driven hops.
+const TRAIN_TOP_Y = 0.97; // playerGroup.y when standing on a train roof
+const PLATFORM_SLACK = 0.75; // extends a train's "footprint" so back-to-back trains stay a continuous platform
+const playerGroup = new THREE.Group();
+playerGroup.position.set(0, 0, PLAY_Z);
+scene.add(playerGroup);
+const playerParts = {}; // populated by the character build block below
+
+// Player auto-positions on top of any train at PLAY_Z in their current lane,
+// so they're always either running on a train roof (when one is there) or on
+// the tracks (when not). No clipping. Pressing a key triggers a brief visual
+// "hop" plus a lateral lerp to the chosen lane.
+const player = {
+  currentLane: 3,
+  hopStart: -1,
+  baseY: 0,
+};
+function lerp(a, b, t) { return a + (b - a) * t; }
+function homeX() { return LANE_X[player.currentLane]; }
+
+// Returns the train currently providing a platform under the player at the
+// play line. PLATFORM_SLACK extends the footprint slightly so consecutive
+// same-lane trains feel like a continuous roof to run on.
+function findTrainUnderPlayer() {
+  for (const t of game.trains) {
+    if (t.userData.consumedAs === 'miss') continue;
+    if (t.userData.note.finger !== player.currentLane) continue;
+    if (t.position.y < -0.05) continue;
+    const halfLen = t.userData.length / 2;
+    if (PLAY_Z >= t.position.z - halfLen - PLATFORM_SLACK
+        && PLAY_Z <= t.position.z + halfLen + PLATFORM_SLACK) return t;
+  }
+  return null;
+}
+
+{
+  // Body
+  const bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 0.45);
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xe85d3a });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.55;
+  body.castShadow = true;
+  playerGroup.add(body);
+  // Head
+  const headGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+  const headMat = new THREE.MeshLambertMaterial({ color: 0xf3c98a });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 1.25;
+  head.castShadow = true;
+  playerGroup.add(head);
+  // Hair-tuft
+  const hairGeo = new THREE.BoxGeometry(0.6, 0.18, 0.6);
+  const hairMat = new THREE.MeshLambertMaterial({ color: 0x3a2818 });
+  const hair = new THREE.Mesh(hairGeo, hairMat);
+  hair.position.y = 1.6;
+  hair.castShadow = true;
+  playerGroup.add(hair);
+  // Arms — each arm hangs from a shoulder pivot so it can swing.
+  for (const [sx, key] of [[-1, 'leftArm'], [1, 'rightArm']]) {
+    const shoulder = new THREE.Group();
+    shoulder.position.set(sx * 0.38, 0.9, 0); // top of the arm
+    const armGeo = new THREE.BoxGeometry(0.18, 0.6, 0.18);
+    const armMat = new THREE.MeshLambertMaterial({ color: 0xe85d3a });
+    const arm = new THREE.Mesh(armGeo, armMat);
+    arm.position.y = -0.3; // hang down from shoulder pivot
+    arm.castShadow = true;
+    shoulder.add(arm);
+    playerGroup.add(shoulder);
+    playerParts[key] = shoulder;
+  }
+  // Legs — each leg pivots from the hip.
+  for (const [sx, key] of [[-1, 'leftLeg'], [1, 'rightLeg']]) {
+    const hip = new THREE.Group();
+    hip.position.set(sx * 0.16, 0.16, 0); // top of the leg, at body bottom
+    const legGeo = new THREE.BoxGeometry(0.22, 0.32, 0.22);
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x2b3a8a });
+    const leg = new THREE.Mesh(legGeo, legMat);
+    leg.position.y = -0.16; // hang down from hip pivot
+    leg.castShadow = true;
+    hip.add(leg);
+    playerGroup.add(hip);
+    playerParts[key] = hip;
+  }
+}
+
+// --- Distant scenery (random voxel hills + trees + houses) ---
+function addScenery() {
+  const rng = (seed => () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  })(12345);
+
+  // Hills — distributed across the full scrolling z range so wrap-around
+  // looks seamless.
+  for (let i = 0; i < 30; i++) {
+    const w = 2 + rng() * 4;
+    const h = 0.6 + rng() * 1.8;
+    const d = 2 + rng() * 4;
+    const side = rng() < 0.5 ? -1 : 1;
+    const x = side * (5 + rng() * 12);
+    const z = SCROLL_WRAP_FAR + rng() * (SCROLL_WRAP_NEAR - SCROLL_WRAP_FAR);
+    const hue = 0.25 + rng() * 0.08;
+    const col = new THREE.Color().setHSL(hue, 0.45, 0.5 + rng() * 0.1);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color: col }));
+    m.position.set(x, h / 2 - 0.1, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    scene.add(m);
+    addScroller(m);
+  }
+  // Trees
+  for (let i = 0; i < 40; i++) {
+    const side = rng() < 0.5 ? -1 : 1;
+    const x = side * (4.5 + rng() * 14);
+    const z = SCROLL_WRAP_FAR + rng() * (SCROLL_WRAP_NEAR - SCROLL_WRAP_FAR);
+    const trunkH = 0.5 + rng() * 0.5;
+    const trunk = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, trunkH, 0.18),
+      new THREE.MeshLambertMaterial({ color: 0x5a3a1a }),
+    );
+    trunk.position.set(x, trunkH / 2, z);
+    trunk.castShadow = true;
+    scene.add(trunk);
+    addScroller(trunk);
+    const leafSize = 0.5 + rng() * 0.4;
+    const leaf = new THREE.Mesh(
+      new THREE.BoxGeometry(leafSize, leafSize, leafSize),
+      new THREE.MeshLambertMaterial({ color: new THREE.Color().setHSL(0.27, 0.55, 0.42 + rng() * 0.1) }),
+    );
+    leaf.position.set(x, trunkH + leafSize / 2, z);
+    leaf.castShadow = true;
+    scene.add(leaf);
+    addScroller(leaf);
+  }
+  // Houses in the far distance
+  for (let i = 0; i < 8; i++) {
+    const side = rng() < 0.5 ? -1 : 1;
+    const x = side * (8 + rng() * 8);
+    const z = SCROLL_WRAP_FAR + rng() * (SCROLL_WRAP_NEAR - SCROLL_WRAP_FAR - 5);
+    const wallH = 1.0 + rng() * 0.5;
+    const wallW = 1.2 + rng() * 0.6;
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(wallW, wallH, wallW),
+      new THREE.MeshLambertMaterial({ color: 0xf4e4c1 }),
+    );
+    wall.position.set(x, wallH / 2, z);
+    wall.castShadow = true;
+    scene.add(wall);
+    addScroller(wall);
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(wallW * 1.1, 0.3, wallW * 1.1),
+      new THREE.MeshLambertMaterial({ color: 0xb04b3a }),
+    );
+    roof.position.set(x, wallH + 0.15, z);
+    roof.castShadow = true;
+    scene.add(roof);
+    addScroller(roof);
+  }
+}
+addScenery();
+
+// --- Trains ---
+const TRAIN_COLORS = {
+  1: 0xf4e1c1, // thumb — cream
+  2: 0x6ab0d8, // index — sky blue
+  3: 0xf5c64a, // middle — gold
+  4: 0xb86fd8, // ring — purple
+  5: 0xe66f6f, // pinky — coral
+};
+
+function createTrain(note, length) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color: TRAIN_COLORS[note.finger] });
+  const bodyGeo = new THREE.BoxGeometry(LANE_WIDTH - 0.25, 0.55, length);
+  const body = new THREE.Mesh(bodyGeo, mat);
+  body.castShadow = true;
+  body.position.y = 0.35;
+  group.add(body);
+  // Roof
+  const roofGeo = new THREE.BoxGeometry(LANE_WIDTH - 0.4, 0.18, Math.max(0.2, length - 0.1));
+  const roofMat = new THREE.MeshLambertMaterial({ color: 0x2a3a55 });
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.position.y = 0.72;
+  roof.castShadow = true;
+  group.add(roof);
+  // Window strip along the side of the carriage.
+  const winGeo = new THREE.BoxGeometry(LANE_WIDTH - 0.45, 0.18, Math.max(0.2, length - 0.5));
+  const winMat = new THREE.MeshBasicMaterial({ color: 0xc6e8fb });
+  const win = new THREE.Mesh(winGeo, winMat);
+  win.position.y = 0.52;
+  group.add(win);
+  // Chimney near the rear of the carriage (away from the camera at spawn).
+  const chimGeo = new THREE.BoxGeometry(0.18, 0.25, 0.18);
+  const chimMat = new THREE.MeshLambertMaterial({ color: 0x2a3a55 });
+  const chim = new THREE.Mesh(chimGeo, chimMat);
+  chim.position.set(0, 0.95, -length / 2 + 0.3);
+  group.add(chim);
+  group.userData.length = length;
+  return group;
+}
+
+// --- Coins (collectibles that sit on top of train carriages) ---
+let _coinTextureCache = null;
+function getCoinTexture() {
+  if (_coinTextureCache) return _coinTextureCache;
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(48, 48, 4, 64, 64, 64);
+  grad.addColorStop(0, '#fff5b8');
+  grad.addColorStop(0.55, '#ffd23a');
+  grad.addColorStop(1, '#a87410');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(64, 64, 62, 0, 2 * Math.PI); ctx.fill();
+  ctx.strokeStyle = '#7a5108';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(64, 64, 46, 0, 2 * Math.PI); ctx.stroke();
+  // Music note symbol — coins are notes
+  ctx.fillStyle = '#5c3d00';
+  ctx.font = 'bold 78px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('♪', 64, 70);
+  _coinTextureCache = new THREE.CanvasTexture(c);
+  _coinTextureCache.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return _coinTextureCache;
+}
+
+const COIN_RADIUS = 0.18;
+const COIN_THICKNESS = 0.06;
+const COIN_LOCAL_Y = 1.10;      // hover above the train roof
+const COIN_COLLECT_Z_TOL = 0.85; // z-window for collection (≈140 ms at TRAIN_SPEED)
+const coinSideMat = new THREE.MeshLambertMaterial({ color: 0xc4920d });
+
+function createCoin() {
+  const geo = new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, COIN_THICKNESS, 18);
+  const faceMat = new THREE.MeshLambertMaterial({ map: getCoinTexture(), emissive: 0x402800, emissiveIntensity: 0.25 });
+  // CylinderGeometry materials: [side, top, bottom]
+  const coin = new THREE.Mesh(geo, [coinSideMat, faceMat, faceMat]);
+  coin.castShadow = true;
+  return coin;
+}
+
+// Pre-compute one coin per crotchet (integer beat). Active-beat coins sit on
+// top of the train roof in the active note's lane; rest-beat coins sit on the
+// previous note's track at ground height (the "last used track"). All coins
+// travel down at TRAIN_SPEED and cross z=PLAY_Z exactly on the beat.
+const COIN_GROUND_Y = 0.50;  // collectible while running on tracks
+function computeBeatCoins() {
+  if (!SCORE.rh_notes.length) return [];
+  const lastNote = SCORE.rh_notes[SCORE.rh_notes.length - 1];
+  const lastBeat = lastNote.beat + lastNote.dur;
+  const out = [];
+  // Count-in: one coin per crotchet for COUNT_IN_BEATS, all on the centre lane,
+  // at ground height — there are no trains yet.
+  for (let k = 0; k < COUNT_IN_BEATS; k++) {
+    out.push({ beat: k, time: k * SEC_PER_BEAT, lane: 3, y: COIN_GROUND_Y, mesh: null, collected: false });
+  }
+  // Music section: one coin per quaver (every 0.5 beats). On a train roof when
+  // the active note covers this beat, otherwise on the previous note's track.
+  let lastUsedLane = 3;
+  for (let k = COUNT_IN_BEATS; k <= lastBeat + 0.001; k += 0.5) {
+    const active = SCORE.rh_notes.find(n => n.beat <= k + 0.001 && k < n.beat + n.dur - 0.001);
+    let lane, y;
+    if (active) {
+      lane = active.finger;
+      y = TRAIN_TOP_Y;
+      lastUsedLane = active.finger;
+    } else {
+      lane = lastUsedLane;
+      y = COIN_GROUND_Y;
+    }
+    out.push({ beat: k, time: k * SEC_PER_BEAT, lane, y, mesh: null, collected: false });
+  }
+  return out;
+}
+
+function spawnBeatCoin(coinSpec) {
+  const mesh = createCoin();
+  mesh.position.x = LANE_X[coinSpec.lane];
+  mesh.position.y = coinSpec.y;
+  mesh.position.z = SPAWN_Z;
+  coinSpec.mesh = mesh;
+  coinSpec.collected = false;
+  scene.add(mesh);
+  game.activeCoins.push(coinSpec);
+}
+
+// =========================================================================
+// Game state
+// =========================================================================
+const game = {
+  state: 'menu',      // 'menu' | 'playing' | 'ended'
+  startedAt: 0,       // audio context time when level started
+  pausedAt: 0,
+  lives: 3,
+  hitCount: 0,
+  missCount: 0,
+  coins: 0,
+  beatCoins: [],       // pre-computed schedule: { beat, time, lane, mesh, collected }
+  beatCoinIdx: 0,      // next coin to spawn into the scene
+  activeCoins: [],     // currently in scene
+  trains: [],         // active train objects
+  scheduledLH: 0,     // next LH index to schedule
+  noteIdx: 0,         // next RH note to process
+  handPosition: { 1: 72, 2: 76, 3: 79, 4: 83, 5: 84 },
+  feedback: { 1: null, 2: null, 3: null, 4: null, 5: null }, // {kind, until}
+};
+
+const LOOKAHEAD_SEC = 2.6; // trains visible this far ahead
+const HIT_WINDOW = 0.15;   // ± seconds around target
+
+function getElapsed() {
+  if (game.state !== 'playing') return 0;
+  return Audio.ctx.currentTime - game.startedAt;
+}
+
+function spawnTrain(note) {
+  // Train length = (distance travelled in note.duration) minus a fixed gap so
+  // consecutive trains on the same track have visible separation.
+  const length = Math.max(0.4, note.duration * TRAIN_SPEED - TRAIN_GAP);
+  console.log(`[spawn] t=${note.time.toFixed(2)}s ${midiToName(note.midi)} (midi ${note.midi}) f${note.finger} dur=${note.duration.toFixed(2)}s len=${length.toFixed(2)}`);
+  const t = createTrain(note, length);
+  t.position.x = LANE_X[note.finger];
+  t.position.y = 0;
+  const elapsed = getElapsed();
+  const dt = note.time - elapsed; // seconds until front reaches play line
+  const u = dt / LOOKAHEAD_SEC;
+  // Front trajectory: at u=1 (spawn) front=SPAWN_Z; at u=0 (hit) front=PLAY_Z.
+  const frontZ = PLAY_Z + (SPAWN_Z - PLAY_Z) * u;
+  t.position.z = frontZ - length / 2; // group center is half-length behind front
+  t.userData.note = note;
+  t.userData.targetTime = note.time;
+  t.userData.consumed = false;
+  scene.add(t);
+  game.trains.push(t);
+}
+
+const TRAIN_SPEED = (PLAY_Z - SPAWN_Z) / LOOKAHEAD_SEC; // units/sec forward
+const TRAIN_GAP = 1.4; // world-units of empty track between back-to-back trains
+
+function updateTrains() {
+  const elapsed = getElapsed();
+  for (let i = game.trains.length - 1; i >= 0; i--) {
+    const t = game.trains[i];
+    const length = t.userData.length;
+    if (t.userData.consumed) {
+      // Use the SAME positioning formula as for unconsumed trains so there's
+      // no discontinuity when a train is consumed mid-flight: anchor to the
+      // note's targetTime, not to the moment of consumption (which can be up
+      // to ±HIT_WINDOW away). Otherwise the train visibly jumps forward or
+      // back at the moment of press.
+      const since = elapsed - (t.userData.consumedAt || elapsed);
+      const frontZ = PLAY_Z + TRAIN_SPEED * (elapsed - t.userData.targetTime);
+      t.position.z = frontZ - length / 2;
+      t.position.y = t.userData.consumedAs === 'hit'
+        ? 0.06 * Math.sin(since * 30) * Math.exp(-since * 2.5)
+        : 0;
+      if (t.position.z - length / 2 > 11) {
+        t.userData.removed = true;
+        scene.remove(t);
+        game.trains.splice(i, 1);
+      }
+      continue;
+    }
+    const dt = t.userData.targetTime - elapsed;
+    const u = dt / LOOKAHEAD_SEC;
+    const frontZ = PLAY_Z + (SPAWN_Z - PLAY_Z) * u;
+    t.position.z = frontZ - length / 2;
+    // Expired: front passed the play line beyond the hit window.
+    if (dt < -HIT_WINDOW) {
+      consumeMiss(t);
+    }
+  }
+}
+
+function consumeHit(train) {
+  train.userData.consumed = true;
+  train.userData.consumedAt = getElapsed();
+  train.userData.consumedAs = 'hit';
+  game.hitCount++;
+  flashPad(train.userData.note.finger, 'hit');
+  updateHud();
+}
+
+function consumeMiss(train) {
+  train.userData.consumed = true;
+  train.userData.consumedAt = getElapsed();
+  train.userData.consumedAs = 'miss';
+  flashPad(train.userData.note.finger, 'miss');
+  // Player let a note pass without playing it — that's a timing miss.
+  loseLife("Missed note");
+}
+
+function flashPad(finger, kind) {
+  const pad = pads[finger];
+  if (!pad) return;
+  // The top face is materials[2]; tint it with emissive briefly.
+  const topMat = pad.material[2];
+  topMat.emissive.setHex(kind === 'hit' ? 0x4cd17a : 0xd14c4c);
+  // Sink the key slightly to feel "pressed".
+  const baseY = KEY_BODY_H / 2 + 0.01;
+  pad.position.y = baseY - 0.03;
+  setTimeout(() => {
+    topMat.emissive.setHex(0x000000);
+    pad.position.y = baseY;
+  }, 200);
+}
+
+function loseLife(reason) {
+  game.lives--;
+  updateLives();
+  flashLifeLost();
+  playRandomOw();
+  console.log(`[life] ${reason} (lives: ${game.lives})`);
+  // The piece keeps playing through the first two hits — only end the level
+  // once every life is gone.
+  if (game.lives <= 0) endGame(false);
+}
+
+let _owAudios = null;
+let _whackAudios = null;
+function _pickAndPlay(pool) {
+  if (!pool || !pool.length) return;
+  const a = pool[Math.floor(Math.random() * pool.length)];
+  try {
+    a.pause();
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (e) {}
+}
+function playRandomOw() {
+  if (!_owAudios) {
+    _owAudios = Array.from(document.querySelectorAll('.ow-audio'));
+    _owAudios.forEach(a => { a.volume = 0.8; });
+  }
+  if (!_whackAudios) {
+    _whackAudios = Array.from(document.querySelectorAll('.whack-audio'));
+    _whackAudios.forEach(a => { a.volume = 0.7; });
+  }
+  // A miss layers an "ow" + a random "whack" so it lands harder.
+  _pickAndPlay(_owAudios);
+  _pickAndPlay(_whackAudios);
+}
+
+function flashLifeLost() {
+  const el = document.getElementById('flash-red');
+  if (!el) return;
+  el.classList.remove('active');
+  // Force a reflow so the animation restarts even on rapid re-triggers.
+  void el.offsetWidth;
+  el.classList.add('active');
+}
+
+function updateLives() {
+  document.querySelectorAll('#lives .heart').forEach((el, i) => {
+    el.classList.toggle('gone', i >= game.lives);
+  });
+}
+
+function updateHud() {
+  document.getElementById('hit-count').textContent = game.hitCount;
+  document.getElementById('total-count').textContent = SCORE.rh_notes.length;
+}
+
+// =========================================================================
+// Player input
+// =========================================================================
+const heldKeys = new Set();
+
+function onKeyDown(e) {
+  if (e.repeat) return;
+  if (!(e.code in KEY_TO_FINGER)) return;
+  e.preventDefault();
+  if (game.state !== 'playing') return;
+  heldKeys.add(e.code);
+  const finger = KEY_TO_FINGER[e.code];
+  const elapsed = getElapsed();
+  const target = findTargetInLane(finger, elapsed);
+
+  if (target) {
+    // HIT — correct lane in the hit window.
+    const midi = target.userData.note.midi;
+    const dtMs = Math.round((elapsed - target.userData.targetTime) * 1000);
+    console.log(`[hit] lane ${finger} -> ${midiToName(midi)} (midi ${midi}) ${dtMs > 0 ? '+' : ''}${dtMs}ms`);
+    game.handPosition[finger] = midi;
+    Audio.noteOn(midi, e.code);
+    consumeHit(target);
+    pulseKey(e.code, 'hit');
+    leapToLane(finger, 'hit');
+    return;
+  }
+
+  // No HIT. If there's a nearby train in this lane (within CLAIM_WINDOW), the
+  // player just missed the timing for it: lose a life, play an ow, flash red.
+  // No note is played — wrong notes are confusing.
+  const claim = findClaimableTrain(finger, elapsed);
+  if (claim) {
+    claim.userData.consumed = true;
+    claim.userData.consumedAt = elapsed;
+    claim.userData.consumedAs = 'miss';
+    flashPad(claim.userData.note.finger, 'miss');
+    pulseKey(e.code, 'miss');
+    leapToLane(finger, 'hit');
+    loseLife(`Bad timing on ${midiToName(claim.userData.note.midi)}`);
+    return;
+  }
+
+  // No train near at all — silent press, no penalty (just a visual hop and
+  // lane change for feedback).
+  console.log(`[idle press] lane ${finger}`);
+  pulseKey(e.code, 'miss');
+  leapToLane(finger, 'hit');
+}
+
+function onKeyUp(e) {
+  if (!(e.code in KEY_TO_FINGER)) return;
+  if (!heldKeys.has(e.code)) return;
+  heldKeys.delete(e.code);
+  Audio.noteOff(e.code);
+  const keyEl = document.querySelector(`.key[data-code="${e.code}"]`);
+  if (keyEl) keyEl.classList.remove('active');
+}
+
+function pulseKey(code, kind) {
+  const keyEl = document.querySelector(`.key[data-code="${code}"]`);
+  if (!keyEl) return;
+  keyEl.classList.add('active');
+  if (kind === 'hit' || kind === 'miss') {
+    keyEl.classList.add(kind);
+    setTimeout(() => keyEl.classList.remove(kind), 220);
+  }
+}
+
+// Find the nearest unconsumed train in this finger's lane within the hit window.
+function findTargetInLane(finger, elapsed) {
+  let best = null;
+  let bestDt = Infinity;
+  for (const t of game.trains) {
+    if (t.userData.consumed) continue;
+    if (t.userData.note.finger !== finger) continue;
+    const dt = Math.abs(t.userData.targetTime - elapsed);
+    if (dt <= HIT_WINDOW && dt < bestDt) {
+      bestDt = dt;
+      best = t;
+    }
+  }
+  return best;
+}
+
+// Wider window than HIT_WINDOW. When the player presses too early/late to
+// score, but still within this grace, we mark the nearest train as consumed
+// so it slides past without colliding — pressing the key counts as an attempt
+// and absorbs the would-be impact.
+const CLAIM_WINDOW = 0.9;
+function findClaimableTrain(finger, elapsed) {
+  let best = null;
+  let bestDt = Infinity;
+  for (const t of game.trains) {
+    if (t.userData.consumed) continue;
+    if (t.userData.note.finger !== finger) continue;
+    const dt = Math.abs(t.userData.targetTime - elapsed);
+    if (dt < CLAIM_WINDOW && dt < bestDt) {
+      bestDt = dt;
+      best = t;
+    }
+  }
+  return best;
+}
+
+// Trigger a hop to the chosen lane. The leap is driven by physics: vertical
+// velocity is set so the character peaks above train-roof height, and a
+// constant horizontal velocity carries them sideways so they land at the new
+// lane's x exactly when they touch down. This makes the lane change look like
+// a coordinated jump instead of an independent slide.
+// Trigger a lane-change + visual hop. The character is auto-positioned on top
+// of any train in their current lane (no clipping), so this is purely visual:
+// a small upward arc + smooth lateral lerp. No "miss" state — physical
+// damage is decoupled from the jump now.
+function leapToLane(finger, kind) {
+  player.currentLane = finger;
+  player.hopStart = getElapsed();
+}
+
+const STRIDE_HZ = 5.5;
+function applyStride(elapsed, intensity = 1) {
+  const phase = elapsed * Math.PI * 2 * STRIDE_HZ * 0.5;
+  const swing = Math.sin(phase) * 0.55 * intensity;
+  if (playerParts.leftLeg)  playerParts.leftLeg.rotation.x = swing;
+  if (playerParts.rightLeg) playerParts.rightLeg.rotation.x = -swing;
+  if (playerParts.leftArm)  playerParts.leftArm.rotation.x = -swing * 0.7;
+  if (playerParts.rightArm) playerParts.rightArm.rotation.x = swing * 0.7;
+}
+
+const HOP_DUR = 0.30;       // seconds for a press hop
+const HOP_HEIGHT = 0.48;    // peak hop above the current base y
+const Y_LERP_RATE = 25;     // lerp factor toward the target base y per second
+const X_LERP_RATE = 18;     // lerp factor toward the target lane x per second
+
+function updatePlayer(elapsed, dt) {
+  applyStride(elapsed, 1);
+
+  // Lateral: smooth-lerp toward the current lane's x. Snap on lane change.
+  const targetX = LANE_X[player.currentLane];
+  const xFactor = 1 - Math.exp(-X_LERP_RATE * dt);
+  playerGroup.position.x += (targetX - playerGroup.position.x) * xFactor;
+
+  // Vertical base: train roof if there's a train at PLAY_Z in this lane,
+  // otherwise tracks. Lerp so the transitions look like stepping on/off.
+  const trainHere = findTrainUnderPlayer();
+  const targetBaseY = trainHere ? TRAIN_TOP_Y : 0;
+  if (player.baseY === undefined) player.baseY = 0;
+  const yFactor = 1 - Math.exp(-Y_LERP_RATE * dt);
+  player.baseY += (targetBaseY - player.baseY) * yFactor;
+
+  // Press hop: brief upward arc on each key press, decays after HOP_DUR.
+  let hopY = 0;
+  if (player.hopStart > 0) {
+    const since = elapsed - player.hopStart;
+    if (since < HOP_DUR) {
+      const p = since / HOP_DUR;
+      hopY = 4 * p * (1 - p) * HOP_HEIGHT;
+    } else {
+      player.hopStart = -1;
+    }
+  }
+
+  const bobY = Math.sin(elapsed * Math.PI * 2 * STRIDE_HZ) * 0.04;
+  playerGroup.position.y = player.baseY + hopY + bobY;
+  playerGroup.position.z = PLAY_Z;
+  playerGroup.rotation.set(0, 0, 0);
+}
+
+// =========================================================================
+// World scrolling
+// =========================================================================
+const SCROLL_RANGE = SCROLL_WRAP_NEAR - SCROLL_WRAP_FAR;
+// =========================================================================
+// Coins
+// =========================================================================
+const COIN_HIGH_SCORE_KEY = 'piano-train-coin-best';
+let coinHighScore = (() => {
+  try { return parseInt(localStorage.getItem(COIN_HIGH_SCORE_KEY) || '0', 10) || 0; }
+  catch (e) { return 0; }
+})();
+
+function updateCoins(elapsed) {
+  // Spawn any coins whose beat is now within the lookahead window.
+  while (game.beatCoinIdx < game.beatCoins.length) {
+    const c = game.beatCoins[game.beatCoinIdx];
+    if (c.time - elapsed > LOOKAHEAD_SEC) break;
+    spawnBeatCoin(c);
+    game.beatCoinIdx++;
+  }
+  // Advance each active coin toward the play line; despawn once past camera.
+  for (let i = game.activeCoins.length - 1; i >= 0; i--) {
+    const c = game.activeCoins[i];
+    const mesh = c.mesh;
+    if (!mesh) { game.activeCoins.splice(i, 1); continue; }
+    const dt = c.time - elapsed;
+    const u = dt / LOOKAHEAD_SEC;
+    mesh.position.z = PLAY_Z + (SPAWN_Z - PLAY_Z) * u;
+    mesh.rotation.y = elapsed * 3.0;
+    mesh.position.y = c.y + Math.sin(elapsed * 4 + c.beat * 0.3) * 0.06;
+    if (c.collected || mesh.position.z > SCROLL_WRAP_NEAR + 1) {
+      scene.remove(mesh);
+      c.mesh = null;
+      game.activeCoins.splice(i, 1);
+    }
+  }
+}
+
+function checkCoinCollection() {
+  // Lane-ID match + z window. Ignoring y on purpose: the player auto-positions
+  // between roof (TRAIN_TOP_Y) and tracks (0) and the y-lerp can take a few
+  // frames, so a strict 3-D distance check would miss coins whose y doesn't
+  // match the player's current y at the brief moment they cross PLAY_Z.
+  for (let i = game.activeCoins.length - 1; i >= 0; i--) {
+    const c = game.activeCoins[i];
+    if (c.collected || !c.mesh) continue;
+    if (c.lane !== player.currentLane) continue;
+    const dz = c.mesh.position.z - PLAY_Z;
+    if (dz > -COIN_COLLECT_Z_TOL && dz < COIN_COLLECT_Z_TOL) {
+      c.collected = true;
+      game.coins++;
+      onCoinCollected(c);
+    }
+  }
+}
+
+function onCoinCollected(coinSpec) {
+  updateCoinHud(true);
+  playMetronomeClick();
+  spawnCoinSparkle(coinSpec);
+  console.log(`[coin] beat ${coinSpec && coinSpec.beat} (total ${game.coins})`);
+}
+
+// Project the coin's world position into screen space and spawn a brief
+// "+1 sparkle" DOM element that floats upward and fades.
+const _sparkleVec = new THREE.Vector3();
+function spawnCoinSparkle(coinSpec) {
+  if (!coinSpec || !coinSpec.mesh) return;
+  _sparkleVec.copy(coinSpec.mesh.position).project(camera);
+  const x = (_sparkleVec.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-_sparkleVec.y * 0.5 + 0.5) * window.innerHeight;
+  const el = document.createElement('div');
+  el.className = 'coin-sparkle';
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  const plus = document.createElement('span');
+  plus.className = 'plus';
+  plus.textContent = '+1';
+  el.appendChild(plus);
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 650);
+}
+
+// Short percussive tick generated directly with Web Audio — distinct from the
+// piano samples so it reads as a metronome over the music.
+function playMetronomeClick() {
+  if (!Audio.ctx) return;
+  const ctx = Audio.ctx;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = 2200;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.003);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.08);
+}
+
+function updateCoinHud(popped) {
+  const el = document.getElementById('coin-count');
+  if (el) el.textContent = game.coins;
+  const bestEl = document.getElementById('coin-best');
+  if (bestEl) bestEl.textContent = Math.max(coinHighScore, game.coins);
+  if (popped) {
+    const hud = document.querySelector('.coin-hud');
+    if (hud) {
+      hud.classList.remove('popped');
+      void hud.offsetWidth; // restart animation
+      hud.classList.add('popped');
+    }
+  }
+}
+
+function updateScrollers(dt) {
+  const advance = SCROLL_SPEED * dt;
+  for (const mesh of scrollers) {
+    mesh.position.z += advance;
+    if (mesh.position.z > SCROLL_WRAP_NEAR) mesh.position.z -= SCROLL_RANGE;
+  }
+}
+
+// =========================================================================
+// LH auto-play scheduler
+// =========================================================================
+function scheduleLH() {
+  const elapsed = getElapsed();
+  while (game.scheduledLH < SCORE.lh_notes.length) {
+    const n = SCORE.lh_notes[game.scheduledLH];
+    if (n.time > elapsed + 0.05) break;
+    game.scheduledLH++;
+    Audio.playFor(n.midi, n.duration * 0.95, 0.55);
+  }
+}
+
+// =========================================================================
+// Loop
+// =========================================================================
+let lastTime = 0;
+function frame(t) {
+  const now = performance.now() / 1000;
+  const dt = Math.min(0.05, now - (lastTime || now));
+  lastTime = now;
+
+  if (game.state === 'playing') {
+    const elapsed = getElapsed();
+
+    // Spawn upcoming trains
+    while (game.noteIdx < SCORE.rh_notes.length) {
+      const n = SCORE.rh_notes[game.noteIdx];
+      if (n.time - elapsed > LOOKAHEAD_SEC) break;
+      spawnTrain(n);
+      game.noteIdx++;
+    }
+
+    updateTrains();
+    scheduleLH();
+    updateScrollers(dt);
+    updateCoins(elapsed);
+    updatePlayer(elapsed, dt);
+    checkCoinCollection();
+
+    // End-of-piece
+    if (elapsed >= SCORE.totalDuration + 0.5 && game.trains.length === 0) {
+      endGame(true);
+    }
+
+    // Progress bar
+    const pct = Math.min(100, (elapsed / SCORE.totalDuration) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+  } else {
+    // Menu / end state: keep the character running in the centre lane.
+    applyStride(now, 0.7);
+    playerGroup.position.set(LANE_X[3], Math.sin(now * Math.PI * 2 * STRIDE_HZ) * 0.04, PLAY_Z);
+    playerGroup.rotation.set(0, 0, 0);
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// =========================================================================
+// Resize
+// =========================================================================
+function resize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  alignKeysWithLanes();
+}
+
+// Project each lane's world-x at the play line into screen space and slide
+// the on-screen key labels to match — so the keys sit at the bottom of the
+// screen directly under their tracks.
+const _projVec = new THREE.Vector3();
+function alignKeysWithLanes() {
+  document.querySelectorAll('.key').forEach((el, i) => {
+    const finger = i + 1;
+    _projVec.set(LANE_X[finger], 0, PLAY_Z);
+    _projVec.project(camera);
+    const x = (_projVec.x * 0.5 + 0.5) * window.innerWidth;
+    el.style.left = `${x}px`;
+  });
+}
+window.addEventListener('resize', resize);
+resize();
+alignKeysWithLanes();
+
+// =========================================================================
+// Start / end flow
+// =========================================================================
+async function startGame() {
+  Audio.init();
+  Audio.resume();
+  const startBtn = document.getElementById('start-btn');
+  const replayBtn = document.getElementById('replay-btn');
+  if (!Audio.loaded) {
+    const origStart = startBtn.textContent;
+    const origReplay = replayBtn.textContent;
+    startBtn.disabled = replayBtn.disabled = true;
+    startBtn.textContent = replayBtn.textContent = 'Loading piano…';
+    try {
+      await Audio.loadPiano();
+    } catch (err) {
+      startBtn.textContent = replayBtn.textContent = 'Load failed — retry?';
+      startBtn.disabled = replayBtn.disabled = false;
+      return;
+    }
+    startBtn.textContent = origStart;
+    replayBtn.textContent = origReplay;
+    startBtn.disabled = replayBtn.disabled = false;
+  }
+  // Reset state
+  game.state = 'playing';
+  game.startedAt = Audio.ctx.currentTime + LOOKAHEAD_SEC + 0.4; // lead-in so first train spawns fully at the horizon
+  game.lives = 3;
+  game.hitCount = 0;
+  game.coins = 0;
+  game.missCount = 0;
+  game.noteIdx = 0;
+  game.scheduledLH = 0;
+  game.trains.forEach(t => scene.remove(t));
+  game.trains.length = 0;
+  game.activeCoins.forEach(c => { if (c.mesh) scene.remove(c.mesh); });
+  game.activeCoins.length = 0;
+  game.beatCoins = computeBeatCoins();
+  game.beatCoinIdx = 0;
+  // Initial K545 opening hand position: thumb on C5, pinky on C6.
+  game.handPosition = { 1: 72, 2: 76, 3: 79, 4: 83, 5: 84 };
+  player.currentLane = 3; // start running in the centre lane
+  player.hopStart = -1;
+  player.baseY = 0;
+  playerGroup.position.set(LANE_X[3], 0, PLAY_Z);
+  playerGroup.rotation.set(0, 0, 0);
+  // Reset HUD
+  updateLives();
+  updateHud();
+  updateCoinHud(false);
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('start-overlay').classList.add('hidden');
+  document.getElementById('end-overlay').classList.add('hidden');
+  // Dump expected RH score so the console log can be cross-referenced against
+  // what actually plays. (LH skipped to keep this short.)
+  console.log('[score] RH expected sequence:');
+  console.log(SCORE.rh_notes.map(n =>
+    `t=${n.time.toFixed(2)}s ${midiToName(n.midi)} f${n.finger}`
+  ).join('\n'));
+  showToast('Get ready…');
+  setTimeout(() => showToast('Go!'), 400);
+}
+
+function endGame(success) {
+  if (game.state === 'ended') return;
+  game.state = 'ended';
+  // Release any held notes
+  heldKeys.forEach(code => Audio.noteOff(code));
+  heldKeys.clear();
+
+  const title = success ? 'Complete!' : 'Try again';
+  const sub = success
+    ? "You played K545 with your right hand. Well played."
+    : "Out of lives — the music played on without you. One more try?";
+  const total = SCORE.rh_notes.length;
+  const acc = total > 0 ? Math.round((game.hitCount / total) * 100) : 0;
+  // Save coin high score.
+  const newBest = game.coins > coinHighScore;
+  if (newBest) {
+    coinHighScore = game.coins;
+    try { localStorage.setItem(COIN_HIGH_SCORE_KEY, String(coinHighScore)); } catch (e) {}
+  }
+  document.getElementById('end-title').textContent = title;
+  document.getElementById('end-sub').textContent = sub;
+  document.getElementById('end-hit').textContent = game.hitCount;
+  document.getElementById('end-acc').textContent = acc + '%';
+  document.getElementById('end-coins').textContent = game.coins;
+  document.getElementById('end-coins-label').textContent = newBest ? 'Coins · new best!' : `Coins · best ${coinHighScore}`;
+  document.getElementById('end-overlay').classList.remove('hidden');
+}
+
+let toastTimer = null;
+function showToast(text) {
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 900);
+}
+
+// Buttons
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('replay-btn').addEventListener('click', startGame);
+
+// Keyboard
+window.addEventListener('keydown', onKeyDown);
+
+// Enter or Space triggers the visible primary button (Start / Play again).
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Enter' && e.code !== 'NumpadEnter' && e.code !== 'Space') return;
+  const startOverlay = document.getElementById('start-overlay');
+  const endOverlay = document.getElementById('end-overlay');
+  let btn = null;
+  if (!startOverlay.classList.contains('hidden')) btn = document.getElementById('start-btn');
+  else if (!endOverlay.classList.contains('hidden')) btn = document.getElementById('replay-btn');
+  if (btn && !btn.disabled) {
+    e.preventDefault();
+    btn.click();
+  }
+});
+window.addEventListener('keyup', onKeyUp);
+
+// Mouse/touch fallback: tapping a key in the keyhint also triggers the note.
+document.querySelectorAll('.key').forEach(el => {
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    onKeyDown({ code: el.dataset.code, repeat: false, preventDefault: () => {} });
+  });
+  el.addEventListener('pointerup', (e) => {
+    e.preventDefault();
+    onKeyUp({ code: el.dataset.code });
+  });
+  el.addEventListener('pointerleave', (e) => {
+    onKeyUp({ code: el.dataset.code });
+  });
+});
+
+// Init HUD on first load (zeroed)
+updateLives();
+updateHud();
+updateCoinHud(false);
+
+// Kick off render loop
+requestAnimationFrame(frame);
+
+// Begin loading piano samples in the background so the Start button can launch
+// the game immediately on most visits. AudioContext is created here but stays
+// suspended until the user's first gesture (the Start click) resumes it.
+Audio.loadPiano().catch(() => { /* startGame will surface the error on click */ });
+</script>
+</body>
+</html>
