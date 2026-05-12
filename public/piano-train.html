@@ -1086,16 +1086,23 @@ const player = {
   currentLane: 3,
   hopStart: -1,
   baseY: 0,
+  knockedUntil: -1,   // elapsed time at which the knocked-flat animation ends
+  knockTilt: 0,       // current x-rotation; lerps to ±π/2 when knocked, 0 otherwise
 };
+const KNOCK_DUR = 0.75;            // how long the character lies flat after a hit
+const KNOCK_TILT_TARGET = Math.PI / 2;
+const KNOCK_TILT_RATE = 22;        // how fast the character tips over
+const KNOCK_RECOVER_RATE = 12;     // how fast they get back up
 function lerp(a, b, t) { return a + (b - a) * t; }
 function homeX() { return LANE_X[player.currentLane]; }
 
 // Returns the train currently providing a platform under the player at the
 // play line. PLATFORM_SLACK extends the footprint slightly so consecutive
-// same-lane trains feel like a continuous roof to run on.
+// same-lane trains feel like a continuous roof to run on. We include
+// consumed-as-miss trains too — they're still physically there, so the
+// player auto-mounts onto them rather than clipping through.
 function findTrainUnderPlayer() {
   for (const t of game.trains) {
-    if (t.userData.consumedAs === 'miss') continue;
     if (t.userData.note.finger !== player.currentLane) continue;
     if (t.position.y < -0.05) continue;
     const halfLen = t.userData.length / 2;
@@ -1484,6 +1491,9 @@ function loseLife(reason) {
   updateLives();
   flashLifeLost();
   playRandomOw();
+  // Tip the character over so they ride the train lying down for a beat —
+  // makes the collision read as a real impact instead of running through.
+  player.knockedUntil = getElapsed() + KNOCK_DUR;
   console.log(`[life] ${reason} (lives: ${game.lives})`);
   // The piece keeps playing through the first two hits — only end the level
   // once every life is gone.
@@ -1671,12 +1681,18 @@ const Y_LERP_RATE = 25;     // lerp factor toward the target base y per second
 const X_LERP_RATE = 18;     // lerp factor toward the target lane x per second
 
 function updatePlayer(elapsed, dt) {
-  applyStride(elapsed, 1);
+  const knocked = player.knockedUntil > elapsed;
+  applyStride(elapsed, knocked ? 0 : 1);
 
-  // Lateral: smooth-lerp toward the current lane's x. Snap on lane change.
+  // Lateral: snap to lane while knocked (no funny sliding while flat),
+  // smooth-lerp otherwise.
   const targetX = LANE_X[player.currentLane];
-  const xFactor = 1 - Math.exp(-X_LERP_RATE * dt);
-  playerGroup.position.x += (targetX - playerGroup.position.x) * xFactor;
+  if (knocked) {
+    playerGroup.position.x = targetX;
+  } else {
+    const xFactor = 1 - Math.exp(-X_LERP_RATE * dt);
+    playerGroup.position.x += (targetX - playerGroup.position.x) * xFactor;
+  }
 
   // Vertical base: train roof if there's a train at PLAY_Z in this lane,
   // otherwise tracks. Lerp so the transitions look like stepping on/off.
@@ -1688,7 +1704,7 @@ function updatePlayer(elapsed, dt) {
 
   // Press hop: brief upward arc on each key press, decays after HOP_DUR.
   let hopY = 0;
-  if (player.hopStart > 0) {
+  if (player.hopStart > 0 && !knocked) {
     const since = elapsed - player.hopStart;
     if (since < HOP_DUR) {
       const p = since / HOP_DUR;
@@ -1698,10 +1714,21 @@ function updatePlayer(elapsed, dt) {
     }
   }
 
-  const bobY = Math.sin(elapsed * Math.PI * 2 * STRIDE_HZ) * 0.04;
-  playerGroup.position.y = player.baseY + hopY + bobY;
+  // Stride bob disabled while knocked (legs aren't running).
+  const bobY = knocked ? 0 : Math.sin(elapsed * Math.PI * 2 * STRIDE_HZ) * 0.04;
+
+  // Knock tilt: lerp toward π/2 (face-down forward) while knocked, back to 0
+  // afterward. Pinning the body slightly lower (-0.18) makes them visibly
+  // sprawled on whatever surface they're on (train roof or tracks).
+  const tiltTarget = knocked ? KNOCK_TILT_TARGET : 0;
+  const tiltRate = knocked ? KNOCK_TILT_RATE : KNOCK_RECOVER_RATE;
+  const tiltFactor = 1 - Math.exp(-tiltRate * dt);
+  player.knockTilt += (tiltTarget - player.knockTilt) * tiltFactor;
+  const sprawlOffset = knocked ? -0.18 : 0;
+
+  playerGroup.position.y = player.baseY + hopY + bobY + sprawlOffset;
   playerGroup.position.z = PLAY_Z;
-  playerGroup.rotation.set(0, 0, 0);
+  playerGroup.rotation.set(player.knockTilt, 0, 0);
 }
 
 // =========================================================================
@@ -1962,6 +1989,8 @@ async function startGame() {
   player.currentLane = 3; // start running in the centre lane
   player.hopStart = -1;
   player.baseY = 0;
+  player.knockedUntil = -1;
+  player.knockTilt = 0;
   playerGroup.position.set(LANE_X[3], 0, PLAY_Z);
   playerGroup.rotation.set(0, 0, 0);
   // Reset HUD
