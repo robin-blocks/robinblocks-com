@@ -72,6 +72,21 @@
   }
   .brand b { color: var(--ink); font-weight: 700; }
 
+  .preview-badge {
+    display: none;
+    margin-left: 10px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255, 210, 58, 0.18);
+    border: 1px solid rgba(255, 210, 58, 0.45);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .preview-badge.show { display: inline-block; }
+
   #stage {
     position: fixed;
     inset: 0;
@@ -371,6 +386,52 @@
   }
   .panel button:hover { filter: brightness(1.05); }
   .panel button:active { transform: translateY(1px); }
+
+  .piece-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    margin: 0 0 18px;
+  }
+  .piece-picker-label {
+    font-size: 11px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .piece-picker-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .piece-chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--chrome-border);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+    line-height: 1.2;
+  }
+  .piece-chip:hover {
+    background: rgba(255,255,255,0.12);
+    color: var(--ink);
+    border-color: rgba(255,255,255,0.22);
+  }
+  .piece-chip.is-active {
+    background: var(--accent);
+    color: #2a1a00;
+    border-color: rgba(0,0,0,0.2);
+    font-weight: 700;
+    cursor: default;
+  }
   .panel .stats {
     display: flex;
     gap: 18px;
@@ -486,12 +547,16 @@
 <div class="overlay" id="start-overlay">
   <div class="panel">
     <h1>Piano Train</h1>
-    <p class="sub">Play Mozart's Sonata Facile (K545) with your right hand — no piano required.</p>
+    <p class="sub" id="piece-sub">Play Mozart's Sonata Facile (K545) with your right hand — no piano required.</p>
     <div class="instructions">
       <p><b>Five keys, five fingers:</b><br/>
       <kbd>B</kbd> thumb · <kbd>U</kbd> index · <kbd>I</kbd> middle · <kbd>O</kbd> ring · <kbd>P</kbd> pinky</p>
       <p>Trains roll down five tracks toward you. When one reaches the line, press the key for that lane to hit it — the right note plays automatically.</p>
       <p>Wrong key or missed timing costs a life. You get <b>three lives</b>.</p>
+    </div>
+    <div class="piece-picker">
+      <div class="piece-picker-label">Pieces</div>
+      <div class="piece-picker-chips" id="piece-picker-chips"></div>
     </div>
     <button id="start-btn">Start playing</button>
   </div>
@@ -530,292 +595,28 @@
 import * as THREE from 'three';
 
 // =========================================================================
-// Score: Mozart Sonata K545, mvt 1, opening (hand-transcribed, ~12 bars).
-// v1 placeholder until the MXL → JSON build pipeline is wired up. Times are
-// in beats; we convert to seconds at startup using metadata.tempo_bpm.
+// Active piece loader. Pieces live in /public/pieces/<id>.json and are
+// listed in /public/pieces/manifest.json. The URL query param ?piece=<id>
+// selects which one to play (default = first in manifest.order). ?preview=1
+// switches into watch-and-listen mode: both hands auto-play, no input
+// required, no life loss — useful for sanity-checking a freshly-extracted
+// score before tweaking fingering.
 // =========================================================================
-const SCORE = {
-  metadata: {
-    title: "Mozart Sonata K545, mvt 1 (opening)",
-    composer: "W. A. Mozart",
-    tempo_bpm: 61,
-    time_signature: [4, 4],
-  },
-  // Extracted from sonata-no16-in-c-major-k545.mid (first 64 beats).
-  // Finger assignment is heuristic (pitch-class → lane), not pianist-grade.
-  rh_notes: [
-    { beat: 0.0000, midi: 72, dur: 1.8979, finger: 1 },  // C5
-    { beat: 2.0000, midi: 76, dur: 0.9479, finger: 3 },  // E5
-    { beat: 3.0000, midi: 79, dur: 0.9479, finger: 5 },  // G5
-    { beat: 4.0000, midi: 71, dur: 1.4979, finger: 4 },  // B4
-    { beat: 5.5000, midi: 72, dur: 0.2479, finger: 1 },  // C5
-    { beat: 5.7500, midi: 74, dur: 0.2479, finger: 2 },  // D5
-    { beat: 6.0000, midi: 72, dur: 0.9479, finger: 1 },  // C5
-    { beat: 8.0000, midi: 81, dur: 1.8979, finger: 4 },  // A5
-    { beat: 10.0000, midi: 79, dur: 0.9479, finger: 5 },  // G5
-    { beat: 11.0000, midi: 84, dur: 0.9479, finger: 1 },  // C6
-    { beat: 12.0000, midi: 79, dur: 0.9479, finger: 5 },  // G5
-    { beat: 13.0000, midi: 77, dur: 0.7479, finger: 4 },  // F5
-    { beat: 13.7500, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 14.0000, midi: 76, dur: 0.9479, finger: 3 },  // E5
-    { beat: 16.0000, midi: 69, dur: 0.4729, finger: 4 },  // A4
-    { beat: 16.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 16.7500, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 17.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 17.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 17.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 17.7500, midi: 79, dur: 0.2354, finger: 5 },  // G5
-    { beat: 18.0000, midi: 81, dur: 0.2354, finger: 4 },  // A5
-    { beat: 18.2500, midi: 79, dur: 0.2354, finger: 5 },  // G5
-    { beat: 18.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 18.7500, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 19.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 19.2500, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 19.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 19.7500, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 20.0000, midi: 67, dur: 0.4729, finger: 5 },  // G4
-    { beat: 20.5000, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 20.7500, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 21.0000, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 21.2500, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 21.5000, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 21.7500, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 22.0000, midi: 79, dur: 0.2354, finger: 5 },  // G5
-    { beat: 22.2500, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 22.5000, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 22.7500, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 23.0000, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 23.2500, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 23.5000, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 23.7500, midi: 67, dur: 0.2354, finger: 5 },  // G4
-    { beat: 24.0000, midi: 65, dur: 0.4729, finger: 4 },  // F4
-    { beat: 24.5000, midi: 67, dur: 0.2354, finger: 5 },  // G4
-    { beat: 24.7500, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 25.0000, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 25.2500, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 25.5000, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 25.7500, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 26.0000, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 26.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 26.5000, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 26.7500, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 27.0000, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 27.2500, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 27.5000, midi: 67, dur: 0.2354, finger: 5 },  // G4
-    { beat: 27.7500, midi: 65, dur: 0.2354, finger: 4 },  // F4
-    { beat: 28.0000, midi: 64, dur: 0.4729, finger: 3 },  // E4
-    { beat: 28.5000, midi: 65, dur: 0.2354, finger: 4 },  // F4
-    { beat: 28.7500, midi: 67, dur: 0.2354, finger: 5 },  // G4
-    { beat: 29.0000, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 29.2500, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 29.5000, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 29.7500, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 30.0000, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 30.2500, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 30.5000, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 30.7500, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 31.0000, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 31.2500, midi: 67, dur: 0.2354, finger: 5 },  // G4
-    { beat: 31.5000, midi: 65, dur: 0.2354, finger: 4 },  // F4
-    { beat: 31.7500, midi: 64, dur: 0.2354, finger: 3 },  // E4
-    { beat: 32.0000, midi: 62, dur: 0.4729, finger: 2 },  // D4
-    { beat: 32.5000, midi: 64, dur: 0.2354, finger: 3 },  // E4
-    { beat: 32.7500, midi: 65, dur: 0.2354, finger: 4 },  // F4
-    { beat: 33.0000, midi: 67, dur: 0.2354, finger: 5 },  // G4
-    { beat: 33.2500, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 33.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 33.7500, midi: 73, dur: 0.2354, finger: 1 },  // C#5
-    { beat: 34.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 34.2500, midi: 69, dur: 0.2354, finger: 4 },  // A4
-    { beat: 34.5000, midi: 71, dur: 0.2354, finger: 4 },  // B4
-    { beat: 34.7500, midi: 73, dur: 0.2354, finger: 1 },  // C#5
-    { beat: 35.0000, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 35.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 35.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 35.7500, midi: 79, dur: 0.2354, finger: 5 },  // G5
-    { beat: 36.0000, midi: 81, dur: 0.2354, finger: 4 },  // A5
-    { beat: 36.2500, midi: 83, dur: 0.2354, finger: 4 },  // B5
-    { beat: 36.5000, midi: 84, dur: 0.2354, finger: 1 },  // C6
-    { beat: 36.7500, midi: 83, dur: 0.2354, finger: 4 },  // B5
-    { beat: 37.0000, midi: 81, dur: 0.2354, finger: 4 },  // A5
-    { beat: 37.2500, midi: 79, dur: 0.2354, finger: 5 },  // G5
-    { beat: 37.5000, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 37.7500, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 38.0000, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 38.2500, midi: 79, dur: 0.2354, finger: 5 },  // G5
-    { beat: 38.5000, midi: 81, dur: 0.2354, finger: 4 },  // A5
-    { beat: 38.7500, midi: 79, dur: 0.2354, finger: 5 },  // G5
-    { beat: 39.0000, midi: 77, dur: 0.2354, finger: 4 },  // F5
-    { beat: 39.2500, midi: 76, dur: 0.2354, finger: 3 },  // E5
-    { beat: 39.5000, midi: 74, dur: 0.2354, finger: 2 },  // D5
-    { beat: 39.7500, midi: 72, dur: 0.2354, finger: 1 },  // C5
-    { beat: 40.0000, midi: 71, dur: 0.4729, finger: 4 },  // B4
-    { beat: 40.5000, midi: 79, dur: 0.4729, finger: 5 },  // G5
-    { beat: 41.0000, midi: 76, dur: 0.4729, finger: 3 },  // E5
-    { beat: 41.5000, midi: 72, dur: 0.4729, finger: 1 },  // C5
-    { beat: 42.0000, midi: 74, dur: 0.4729, finger: 2 },  // D5
-    { beat: 42.5000, midi: 79, dur: 0.4729, finger: 5 },  // G5
-    { beat: 43.0000, midi: 76, dur: 0.4729, finger: 3 },  // E5
-    { beat: 43.5000, midi: 72, dur: 0.4729, finger: 1 },  // C5
-    { beat: 44.0000, midi: 74, dur: 0.9479, finger: 2 },  // D5
-    { beat: 45.0000, midi: 71, dur: 0.9479, finger: 4 },  // B4
-    { beat: 46.0000, midi: 67, dur: 0.9479, finger: 5 },  // G4
-    { beat: 52.0000, midi: 86, dur: 0.4979, finger: 2 },  // D6
-    { beat: 52.5000, midi: 83, dur: 0.4729, finger: 4 },  // B5
-    { beat: 53.0000, midi: 79, dur: 1.4979, finger: 5 },  // G5
-    { beat: 54.5000, midi: 81, dur: 0.2479, finger: 4 },  // A5
-    { beat: 54.7500, midi: 83, dur: 0.2479, finger: 4 },  // B5
-    { beat: 55.0000, midi: 81, dur: 0.4729, finger: 4 },  // A5
-    { beat: 55.5000, midi: 79, dur: 0.2479, finger: 5 },  // G5
-    { beat: 56.0000, midi: 79, dur: 0.9854, finger: 5 },  // G5
-    { beat: 57.0000, midi: 78, dur: 0.9479, finger: 4 },  // F#5
-    { beat: 60.0000, midi: 86, dur: 0.4979, finger: 2 },  // D6
-    { beat: 60.5000, midi: 83, dur: 0.4729, finger: 4 },  // B5
-    { beat: 61.0000, midi: 79, dur: 1.4979, finger: 5 },  // G5
-    { beat: 62.5000, midi: 81, dur: 0.2479, finger: 4 },  // A5
-    { beat: 62.7500, midi: 83, dur: 0.2479, finger: 4 },  // B5
-    { beat: 63.0000, midi: 81, dur: 0.4729, finger: 4 },  // A5
-    { beat: 63.5000, midi: 79, dur: 0.2479, finger: 5 },  // G5
-  ],
-  lh_notes: [
-    { beat: 0.0000, midi: 60, dur: 0.4729 },  // C4
-    { beat: 0.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 1.0000, midi: 64, dur: 0.4729 },  // E4
-    { beat: 1.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 2.0000, midi: 60, dur: 0.4729 },  // C4
-    { beat: 2.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 3.0000, midi: 64, dur: 0.4729 },  // E4
-    { beat: 3.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 4.0000, midi: 62, dur: 0.4729 },  // D4
-    { beat: 4.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 5.0000, midi: 65, dur: 0.4729 },  // F4
-    { beat: 5.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 6.0000, midi: 60, dur: 0.4729 },  // C4
-    { beat: 6.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 7.0000, midi: 64, dur: 0.4729 },  // E4
-    { beat: 7.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 8.0000, midi: 60, dur: 0.4729 },  // C4
-    { beat: 8.5000, midi: 69, dur: 0.4729 },  // A4
-    { beat: 9.0000, midi: 65, dur: 0.4729 },  // F4
-    { beat: 9.5000, midi: 69, dur: 0.4729 },  // A4
-    { beat: 10.0000, midi: 60, dur: 0.4729 },  // C4
-    { beat: 10.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 11.0000, midi: 64, dur: 0.4729 },  // E4
-    { beat: 11.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 12.0000, midi: 59, dur: 0.4729 },  // B3
-    { beat: 12.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 13.0000, midi: 62, dur: 0.4729 },  // D4
-    { beat: 13.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 14.0000, midi: 60, dur: 0.4729 },  // C4
-    { beat: 14.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 15.0000, midi: 64, dur: 0.4729 },  // E4
-    { beat: 15.5000, midi: 67, dur: 0.4729 },  // G4
-    { beat: 16.0000, midi: 65, dur: 0.9479 },  // F4
-    { beat: 19.0000, midi: 53, dur: 0.9479 },  // F3
-    { beat: 19.0000, midi: 60, dur: 0.9479 },  // C4
-    { beat: 20.0000, midi: 52, dur: 0.9479 },  // E3
-    { beat: 20.0000, midi: 60, dur: 0.9479 },  // C4
-    { beat: 23.0000, midi: 52, dur: 0.9479 },  // E3
-    { beat: 23.0000, midi: 60, dur: 0.9479 },  // C4
-    { beat: 24.0000, midi: 50, dur: 0.9479 },  // D3
-    { beat: 24.0000, midi: 60, dur: 0.9479 },  // C4
-    { beat: 27.0000, midi: 50, dur: 0.9479 },  // D3
-    { beat: 27.0000, midi: 59, dur: 0.9479 },  // B3
-    { beat: 28.0000, midi: 48, dur: 0.9479 },  // C3
-    { beat: 28.0000, midi: 60, dur: 0.9479 },  // C4
-    { beat: 31.0000, midi: 48, dur: 0.9479 },  // C3
-    { beat: 31.0000, midi: 52, dur: 0.9479 },  // E3
-    { beat: 32.0000, midi: 53, dur: 3.7979 },  // F3
-    { beat: 32.0000, midi: 57, dur: 3.7979 },  // A3
-    { beat: 36.0000, midi: 53, dur: 1.4229 },  // F3
-    { beat: 37.5000, midi: 55, dur: 0.4729 },  // G3
-    { beat: 38.0000, midi: 57, dur: 1.4229 },  // A3
-    { beat: 39.5000, midi: 54, dur: 0.4729 },  // F#3
-    { beat: 40.0000, midi: 43, dur: 0.2354 },  // G2
-    { beat: 40.2500, midi: 47, dur: 0.2354 },  // B2
-    { beat: 40.5000, midi: 50, dur: 0.2354 },  // D3
-    { beat: 40.7500, midi: 55, dur: 0.2354 },  // G3
-    { beat: 41.0000, midi: 43, dur: 0.2354 },  // G2
-    { beat: 41.2500, midi: 48, dur: 0.2354 },  // C3
-    { beat: 41.5000, midi: 52, dur: 0.2354 },  // E3
-    { beat: 41.7500, midi: 55, dur: 0.2354 },  // G3
-    { beat: 42.0000, midi: 43, dur: 0.2354 },  // G2
-    { beat: 42.2500, midi: 47, dur: 0.2354 },  // B2
-    { beat: 42.5000, midi: 50, dur: 0.2354 },  // D3
-    { beat: 42.7500, midi: 55, dur: 0.2354 },  // G3
-    { beat: 43.0000, midi: 43, dur: 0.2354 },  // G2
-    { beat: 43.2500, midi: 48, dur: 0.2354 },  // C3
-    { beat: 43.5000, midi: 52, dur: 0.2354 },  // E3
-    { beat: 43.7500, midi: 55, dur: 0.2354 },  // G3
-    { beat: 44.0000, midi: 43, dur: 0.9479 },  // G2
-    { beat: 45.0000, midi: 55, dur: 0.9479 },  // G3
-    { beat: 46.0000, midi: 43, dur: 0.9479 },  // G2
-    { beat: 48.0000, midi: 61, dur: 0.2354 },  // C#4
-    { beat: 48.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 48.5000, midi: 61, dur: 0.2354 },  // C#4
-    { beat: 48.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 49.0000, midi: 61, dur: 0.2354 },  // C#4
-    { beat: 49.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 49.5000, midi: 61, dur: 0.2354 },  // C#4
-    { beat: 49.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 50.0000, midi: 60, dur: 0.2354 },  // C4
-    { beat: 50.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 50.5000, midi: 60, dur: 0.2354 },  // C4
-    { beat: 50.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 51.0000, midi: 60, dur: 0.2354 },  // C4
-    { beat: 51.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 51.5000, midi: 60, dur: 0.2354 },  // C4
-    { beat: 51.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 52.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 52.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 52.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 52.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 53.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 53.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 53.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 53.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 54.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 54.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 54.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 54.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 55.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 55.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 55.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 55.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 56.0000, midi: 60, dur: 0.2354 },  // C4
-    { beat: 56.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 56.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 56.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 57.0000, midi: 57, dur: 0.2354 },  // A3
-    { beat: 57.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 57.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 57.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 58.0000, midi: 60, dur: 0.2354 },  // C4
-    { beat: 58.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 58.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 58.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 59.0000, midi: 60, dur: 0.2354 },  // C4
-    { beat: 59.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 59.5000, midi: 57, dur: 0.2354 },  // A3
-    { beat: 59.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 60.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 60.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 60.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 60.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 61.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 61.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 61.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 61.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 62.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 62.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 62.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 62.7500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 63.0000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 63.2500, midi: 62, dur: 0.2354 },  // D4
-    { beat: 63.5000, midi: 59, dur: 0.2354 },  // B3
-    { beat: 63.7500, midi: 62, dur: 0.2354 },  // D4
-  ],
-};
+const _params = new URLSearchParams(window.location.search);
+const IS_PREVIEW = _params.get("preview") === "1";
+
+const _manifest = await fetch("/pieces/manifest.json", { cache: "no-cache" }).then(r => r.json());
+const PIECE_ORDER = _manifest.order;
+const PIECES_META = _manifest.pieces;
+
+function pickActivePieceId() {
+  const requested = _params.get("piece");
+  if (requested && Object.prototype.hasOwnProperty.call(PIECES_META, requested)) return requested;
+  return PIECE_ORDER[0];
+}
+const ACTIVE_PIECE_ID = pickActivePieceId();
+const SCORE = await fetch(`/pieces/${ACTIVE_PIECE_ID}.json`, { cache: "no-cache" }).then(r => r.json());
+
 
 // Convert beats to seconds. Shift the whole piece by COUNT_IN_BEATS so the
 // player gets a steady metronomic count-in (and four warmup coins) before the
@@ -1446,11 +1247,27 @@ function updateTrains() {
     const u = dt / LOOKAHEAD_SEC;
     const frontZ = PLAY_Z + (SPAWN_Z - PLAY_Z) * u;
     t.position.z = frontZ - length / 2;
+    // Preview mode: auto-fire the hit at the moment the front reaches the
+    // play line, so the watcher hears the RH melody and sees the lane motion
+    // without needing to press anything.
+    if (IS_PREVIEW && dt <= 0) {
+      previewAutoHit(t);
+      continue;
+    }
     // Expired: front passed the play line beyond the hit window.
     if (dt < -HIT_WINDOW) {
       consumeMiss(t);
     }
   }
+}
+
+function previewAutoHit(train) {
+  const note = train.userData.note;
+  Audio.playFor(note.midi, note.duration * 0.95, 0.85);
+  game.handPosition[note.finger] = note.midi;
+  consumeHit(train);
+  pulseKey(FINGER_TO_CODE[note.finger], 'hit');
+  leapToLane(note.finger, 'hit');
 }
 
 function consumeHit(train) {
@@ -1487,6 +1304,7 @@ function flashPad(finger, kind) {
 }
 
 function loseLife(reason) {
+  if (IS_PREVIEW) return; // preview is a watch-and-listen mode, no penalties
   game.lives--;
   updateLives();
   flashLifeLost();
@@ -1984,8 +1802,9 @@ async function startGame() {
   game.activeCoins.length = 0;
   game.beatCoins = computeBeatCoins();
   game.beatCoinIdx = 0;
-  // Initial K545 opening hand position: thumb on C5, pinky on C6.
-  game.handPosition = { 1: 72, 2: 76, 3: 79, 4: 83, 5: 84 };
+  // Seed the hand position from the active piece's opening (used to give the
+  // first few notes a non-zero pre-hit velocity in the visual feedback).
+  game.handPosition = { ...SCORE.initial_hand_position };
   player.currentLane = 3; // start running in the centre lane
   player.hopStart = -1;
   player.baseY = 0;
@@ -2019,7 +1838,7 @@ function endGame(success) {
 
   const title = success ? 'Complete!' : 'Try again';
   const sub = success
-    ? "You played K545 with your right hand. Well played."
+    ? SCORE.metadata.success_message
     : "Out of lives — the music played on without you. One more try?";
   const total = SCORE.rh_notes.length;
   const acc = total > 0 ? Math.round((game.hitCount / total) * 100) : 0;
@@ -2083,6 +1902,28 @@ document.querySelectorAll('.key').forEach(el => {
     onKeyUp({ code: el.dataset.code });
   });
 });
+
+// Apply active piece's display strings and build the piece-picker chips.
+document.title = `Piano Train · ${SCORE.metadata.short_title}${IS_PREVIEW ? ' (preview)' : ''}`;
+document.querySelector('.brand').innerHTML = `<b>Piano Train</b> · ${SCORE.metadata.short_title}` +
+  (IS_PREVIEW ? '<span class="preview-badge show">Preview · auto-play</span>' : '');
+document.getElementById('piece-sub').textContent = IS_PREVIEW
+  ? 'Preview mode — both hands auto-play. Watch and listen; no input needed.'
+  : SCORE.metadata.sub;
+if (IS_PREVIEW) {
+  document.getElementById('start-btn').textContent = 'Start preview';
+  document.getElementById('replay-btn').textContent = 'Replay preview';
+}
+{
+  const chipsEl = document.getElementById('piece-picker-chips');
+  chipsEl.innerHTML = PIECE_ORDER.map(id => {
+    const label = PIECES_META[id].short_title;
+    if (id === ACTIVE_PIECE_ID) {
+      return `<span class="piece-chip is-active" aria-current="page">${label}</span>`;
+    }
+    return `<a class="piece-chip" href="?piece=${encodeURIComponent(id)}">${label}</a>`;
+  }).join('');
+}
 
 // Init HUD on first load (zeroed)
 updateLives();

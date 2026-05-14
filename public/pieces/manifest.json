@@ -1,0 +1,7 @@
+{
+  "order": ["k545", "chopin_op9_no2"],
+  "pieces": {
+    "k545": { "short_title": "Mozart K545" },
+    "chopin_op9_no2": { "short_title": "Chopin Op. 9 No. 2" }
+  }
+}

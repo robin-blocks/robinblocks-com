@@ -770,7 +770,7 @@ function initApp() {
       items: [
         { id: 'breakout', logo: 'breakout', label: 'Breakout Piano', sublabel: 'A mini-game where you play Breakout and hit piano keys', href: '/breakout-piano.html', tag: 'project', priority: 1, due: 'Play →', isLocal: true },
         { id: 'happybard', logo: 'happybard', label: 'Happy Bard', sublabel: 'Flappy Bird, but you sing to keep the bird aloft', href: '/happy-bard.html', tag: 'project', priority: 1, due: 'Play →', isLocal: true },
-        { id: 'pianotrain', logo: 'pianotrain', label: 'Piano Train', sublabel: 'Crossy Road meets piano — play Mozart with five fingers', href: '/piano-train.html', tag: 'project', priority: 1, due: 'Play →', isLocal: true },
+        { id: 'pianotrain', logo: 'pianotrain', label: 'Piano Train', sublabel: 'Crossy Road meets piano — Mozart K545, Chopin Op. 9 No. 2', href: '/piano-train.html', tag: 'project', priority: 1, due: 'Play →', isLocal: true },
         { id: 'museverse', logo: 'museverse', label: 'Museverse', sublabel: 'museverse.xyz', href: 'https://museverse.xyz', tag: 'project', priority: 2, due: 'Visit' },
         { id: 'polydance', logo: 'polydance', label: 'Polydance', sublabel: 'polydance.net', href: 'https://polydance.net', tag: 'project', priority: 2, due: 'Visit' },
       ],

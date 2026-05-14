@@ -1,0 +1,1497 @@
+{
+  "metadata": {
+    "title": "Mozart Sonata K545, mvt 1 (opening)",
+    "short_title": "Mozart K545",
+    "composer": "W. A. Mozart",
+    "sub": "Play Mozart's Sonata Facile (K545) with your right hand — no piano required.",
+    "success_message": "You played K545 with your right hand. Well played.",
+    "tempo_bpm": 61,
+    "time_signature": [
+      4,
+      4
+    ]
+  },
+  "initial_hand_position": {
+    "1": 72,
+    "2": 76,
+    "3": 79,
+    "4": 83,
+    "5": 84
+  },
+  "rh_notes": [
+    {
+      "beat": 0,
+      "midi": 72,
+      "dur": 1.8979,
+      "finger": 1
+    },
+    {
+      "beat": 2,
+      "midi": 76,
+      "dur": 0.9479,
+      "finger": 3
+    },
+    {
+      "beat": 3,
+      "midi": 79,
+      "dur": 0.9479,
+      "finger": 5
+    },
+    {
+      "beat": 4,
+      "midi": 71,
+      "dur": 1.4979,
+      "finger": 4
+    },
+    {
+      "beat": 5.5,
+      "midi": 72,
+      "dur": 0.2479,
+      "finger": 1
+    },
+    {
+      "beat": 5.75,
+      "midi": 74,
+      "dur": 0.2479,
+      "finger": 2
+    },
+    {
+      "beat": 6,
+      "midi": 72,
+      "dur": 0.9479,
+      "finger": 1
+    },
+    {
+      "beat": 8,
+      "midi": 81,
+      "dur": 1.8979,
+      "finger": 4
+    },
+    {
+      "beat": 10,
+      "midi": 79,
+      "dur": 0.9479,
+      "finger": 5
+    },
+    {
+      "beat": 11,
+      "midi": 84,
+      "dur": 0.9479,
+      "finger": 1
+    },
+    {
+      "beat": 12,
+      "midi": 79,
+      "dur": 0.9479,
+      "finger": 5
+    },
+    {
+      "beat": 13,
+      "midi": 77,
+      "dur": 0.7479,
+      "finger": 4
+    },
+    {
+      "beat": 13.75,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 14,
+      "midi": 76,
+      "dur": 0.9479,
+      "finger": 3
+    },
+    {
+      "beat": 16,
+      "midi": 69,
+      "dur": 0.4729,
+      "finger": 4
+    },
+    {
+      "beat": 16.5,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 16.75,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 17,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 17.25,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 17.5,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 17.75,
+      "midi": 79,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 18,
+      "midi": 81,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 18.25,
+      "midi": 79,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 18.5,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 18.75,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 19,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 19.25,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 19.5,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 19.75,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 20,
+      "midi": 67,
+      "dur": 0.4729,
+      "finger": 5
+    },
+    {
+      "beat": 20.5,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 20.75,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 21,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 21.25,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 21.5,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 21.75,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 22,
+      "midi": 79,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 22.25,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 22.5,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 22.75,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 23,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 23.25,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 23.5,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 23.75,
+      "midi": 67,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 24,
+      "midi": 65,
+      "dur": 0.4729,
+      "finger": 4
+    },
+    {
+      "beat": 24.5,
+      "midi": 67,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 24.75,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 25,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 25.25,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 25.5,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 25.75,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 26,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 26.25,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 26.5,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 26.75,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 27,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 27.25,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 27.5,
+      "midi": 67,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 27.75,
+      "midi": 65,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 28,
+      "midi": 64,
+      "dur": 0.4729,
+      "finger": 3
+    },
+    {
+      "beat": 28.5,
+      "midi": 65,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 28.75,
+      "midi": 67,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 29,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 29.25,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 29.5,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 29.75,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 30,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 30.25,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 30.5,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 30.75,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 31,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 31.25,
+      "midi": 67,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 31.5,
+      "midi": 65,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 31.75,
+      "midi": 64,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 32,
+      "midi": 62,
+      "dur": 0.4729,
+      "finger": 2
+    },
+    {
+      "beat": 32.5,
+      "midi": 64,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 32.75,
+      "midi": 65,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 33,
+      "midi": 67,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 33.25,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 33.5,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 33.75,
+      "midi": 73,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 34,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 34.25,
+      "midi": 69,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 34.5,
+      "midi": 71,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 34.75,
+      "midi": 73,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 35,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 35.25,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 35.5,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 35.75,
+      "midi": 79,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 36,
+      "midi": 81,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 36.25,
+      "midi": 83,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 36.5,
+      "midi": 84,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 36.75,
+      "midi": 83,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 37,
+      "midi": 81,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 37.25,
+      "midi": 79,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 37.5,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 37.75,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 38,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 38.25,
+      "midi": 79,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 38.5,
+      "midi": 81,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 38.75,
+      "midi": 79,
+      "dur": 0.2354,
+      "finger": 5
+    },
+    {
+      "beat": 39,
+      "midi": 77,
+      "dur": 0.2354,
+      "finger": 4
+    },
+    {
+      "beat": 39.25,
+      "midi": 76,
+      "dur": 0.2354,
+      "finger": 3
+    },
+    {
+      "beat": 39.5,
+      "midi": 74,
+      "dur": 0.2354,
+      "finger": 2
+    },
+    {
+      "beat": 39.75,
+      "midi": 72,
+      "dur": 0.2354,
+      "finger": 1
+    },
+    {
+      "beat": 40,
+      "midi": 71,
+      "dur": 0.4729,
+      "finger": 4
+    },
+    {
+      "beat": 40.5,
+      "midi": 79,
+      "dur": 0.4729,
+      "finger": 5
+    },
+    {
+      "beat": 41,
+      "midi": 76,
+      "dur": 0.4729,
+      "finger": 3
+    },
+    {
+      "beat": 41.5,
+      "midi": 72,
+      "dur": 0.4729,
+      "finger": 1
+    },
+    {
+      "beat": 42,
+      "midi": 74,
+      "dur": 0.4729,
+      "finger": 2
+    },
+    {
+      "beat": 42.5,
+      "midi": 79,
+      "dur": 0.4729,
+      "finger": 5
+    },
+    {
+      "beat": 43,
+      "midi": 76,
+      "dur": 0.4729,
+      "finger": 3
+    },
+    {
+      "beat": 43.5,
+      "midi": 72,
+      "dur": 0.4729,
+      "finger": 1
+    },
+    {
+      "beat": 44,
+      "midi": 74,
+      "dur": 0.9479,
+      "finger": 2
+    },
+    {
+      "beat": 45,
+      "midi": 71,
+      "dur": 0.9479,
+      "finger": 4
+    },
+    {
+      "beat": 46,
+      "midi": 67,
+      "dur": 0.9479,
+      "finger": 5
+    },
+    {
+      "beat": 52,
+      "midi": 86,
+      "dur": 0.4979,
+      "finger": 2
+    },
+    {
+      "beat": 52.5,
+      "midi": 83,
+      "dur": 0.4729,
+      "finger": 4
+    },
+    {
+      "beat": 53,
+      "midi": 79,
+      "dur": 1.4979,
+      "finger": 5
+    },
+    {
+      "beat": 54.5,
+      "midi": 81,
+      "dur": 0.2479,
+      "finger": 4
+    },
+    {
+      "beat": 54.75,
+      "midi": 83,
+      "dur": 0.2479,
+      "finger": 4
+    },
+    {
+      "beat": 55,
+      "midi": 81,
+      "dur": 0.4729,
+      "finger": 4
+    },
+    {
+      "beat": 55.5,
+      "midi": 79,
+      "dur": 0.2479,
+      "finger": 5
+    },
+    {
+      "beat": 56,
+      "midi": 79,
+      "dur": 0.9854,
+      "finger": 5
+    },
+    {
+      "beat": 57,
+      "midi": 78,
+      "dur": 0.9479,
+      "finger": 4
+    },
+    {
+      "beat": 60,
+      "midi": 86,
+      "dur": 0.4979,
+      "finger": 2
+    },
+    {
+      "beat": 60.5,
+      "midi": 83,
+      "dur": 0.4729,
+      "finger": 4
+    },
+    {
+      "beat": 61,
+      "midi": 79,
+      "dur": 1.4979,
+      "finger": 5
+    },
+    {
+      "beat": 62.5,
+      "midi": 81,
+      "dur": 0.2479,
+      "finger": 4
+    },
+    {
+      "beat": 62.75,
+      "midi": 83,
+      "dur": 0.2479,
+      "finger": 4
+    },
+    {
+      "beat": 63,
+      "midi": 81,
+      "dur": 0.4729,
+      "finger": 4
+    },
+    {
+      "beat": 63.5,
+      "midi": 79,
+      "dur": 0.2479,
+      "finger": 5
+    }
+  ],
+  "lh_notes": [
+    {
+      "beat": 0,
+      "midi": 60,
+      "dur": 0.4729
+    },
+    {
+      "beat": 0.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 1,
+      "midi": 64,
+      "dur": 0.4729
+    },
+    {
+      "beat": 1.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 2,
+      "midi": 60,
+      "dur": 0.4729
+    },
+    {
+      "beat": 2.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 3,
+      "midi": 64,
+      "dur": 0.4729
+    },
+    {
+      "beat": 3.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 4,
+      "midi": 62,
+      "dur": 0.4729
+    },
+    {
+      "beat": 4.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 5,
+      "midi": 65,
+      "dur": 0.4729
+    },
+    {
+      "beat": 5.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 6,
+      "midi": 60,
+      "dur": 0.4729
+    },
+    {
+      "beat": 6.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 7,
+      "midi": 64,
+      "dur": 0.4729
+    },
+    {
+      "beat": 7.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 8,
+      "midi": 60,
+      "dur": 0.4729
+    },
+    {
+      "beat": 8.5,
+      "midi": 69,
+      "dur": 0.4729
+    },
+    {
+      "beat": 9,
+      "midi": 65,
+      "dur": 0.4729
+    },
+    {
+      "beat": 9.5,
+      "midi": 69,
+      "dur": 0.4729
+    },
+    {
+      "beat": 10,
+      "midi": 60,
+      "dur": 0.4729
+    },
+    {
+      "beat": 10.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 11,
+      "midi": 64,
+      "dur": 0.4729
+    },
+    {
+      "beat": 11.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 12,
+      "midi": 59,
+      "dur": 0.4729
+    },
+    {
+      "beat": 12.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 13,
+      "midi": 62,
+      "dur": 0.4729
+    },
+    {
+      "beat": 13.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 14,
+      "midi": 60,
+      "dur": 0.4729
+    },
+    {
+      "beat": 14.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 15,
+      "midi": 64,
+      "dur": 0.4729
+    },
+    {
+      "beat": 15.5,
+      "midi": 67,
+      "dur": 0.4729
+    },
+    {
+      "beat": 16,
+      "midi": 65,
+      "dur": 0.9479
+    },
+    {
+      "beat": 19,
+      "midi": 53,
+      "dur": 0.9479
+    },
+    {
+      "beat": 19,
+      "midi": 60,
+      "dur": 0.9479
+    },
+    {
+      "beat": 20,
+      "midi": 52,
+      "dur": 0.9479
+    },
+    {
+      "beat": 20,
+      "midi": 60,
+      "dur": 0.9479
+    },
+    {
+      "beat": 23,
+      "midi": 52,
+      "dur": 0.9479
+    },
+    {
+      "beat": 23,
+      "midi": 60,
+      "dur": 0.9479
+    },
+    {
+      "beat": 24,
+      "midi": 50,
+      "dur": 0.9479
+    },
+    {
+      "beat": 24,
+      "midi": 60,
+      "dur": 0.9479
+    },
+    {
+      "beat": 27,
+      "midi": 50,
+      "dur": 0.9479
+    },
+    {
+      "beat": 27,
+      "midi": 59,
+      "dur": 0.9479
+    },
+    {
+      "beat": 28,
+      "midi": 48,
+      "dur": 0.9479
+    },
+    {
+      "beat": 28,
+      "midi": 60,
+      "dur": 0.9479
+    },
+    {
+      "beat": 31,
+      "midi": 48,
+      "dur": 0.9479
+    },
+    {
+      "beat": 31,
+      "midi": 52,
+      "dur": 0.9479
+    },
+    {
+      "beat": 32,
+      "midi": 53,
+      "dur": 3.7979
+    },
+    {
+      "beat": 32,
+      "midi": 57,
+      "dur": 3.7979
+    },
+    {
+      "beat": 36,
+      "midi": 53,
+      "dur": 1.4229
+    },
+    {
+      "beat": 37.5,
+      "midi": 55,
+      "dur": 0.4729
+    },
+    {
+      "beat": 38,
+      "midi": 57,
+      "dur": 1.4229
+    },
+    {
+      "beat": 39.5,
+      "midi": 54,
+      "dur": 0.4729
+    },
+    {
+      "beat": 40,
+      "midi": 43,
+      "dur": 0.2354
+    },
+    {
+      "beat": 40.25,
+      "midi": 47,
+      "dur": 0.2354
+    },
+    {
+      "beat": 40.5,
+      "midi": 50,
+      "dur": 0.2354
+    },
+    {
+      "beat": 40.75,
+      "midi": 55,
+      "dur": 0.2354
+    },
+    {
+      "beat": 41,
+      "midi": 43,
+      "dur": 0.2354
+    },
+    {
+      "beat": 41.25,
+      "midi": 48,
+      "dur": 0.2354
+    },
+    {
+      "beat": 41.5,
+      "midi": 52,
+      "dur": 0.2354
+    },
+    {
+      "beat": 41.75,
+      "midi": 55,
+      "dur": 0.2354
+    },
+    {
+      "beat": 42,
+      "midi": 43,
+      "dur": 0.2354
+    },
+    {
+      "beat": 42.25,
+      "midi": 47,
+      "dur": 0.2354
+    },
+    {
+      "beat": 42.5,
+      "midi": 50,
+      "dur": 0.2354
+    },
+    {
+      "beat": 42.75,
+      "midi": 55,
+      "dur": 0.2354
+    },
+    {
+      "beat": 43,
+      "midi": 43,
+      "dur": 0.2354
+    },
+    {
+      "beat": 43.25,
+      "midi": 48,
+      "dur": 0.2354
+    },
+    {
+      "beat": 43.5,
+      "midi": 52,
+      "dur": 0.2354
+    },
+    {
+      "beat": 43.75,
+      "midi": 55,
+      "dur": 0.2354
+    },
+    {
+      "beat": 44,
+      "midi": 43,
+      "dur": 0.9479
+    },
+    {
+      "beat": 45,
+      "midi": 55,
+      "dur": 0.9479
+    },
+    {
+      "beat": 46,
+      "midi": 43,
+      "dur": 0.9479
+    },
+    {
+      "beat": 48,
+      "midi": 61,
+      "dur": 0.2354
+    },
+    {
+      "beat": 48.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 48.5,
+      "midi": 61,
+      "dur": 0.2354
+    },
+    {
+      "beat": 48.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 49,
+      "midi": 61,
+      "dur": 0.2354
+    },
+    {
+      "beat": 49.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 49.5,
+      "midi": 61,
+      "dur": 0.2354
+    },
+    {
+      "beat": 49.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 50,
+      "midi": 60,
+      "dur": 0.2354
+    },
+    {
+      "beat": 50.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 50.5,
+      "midi": 60,
+      "dur": 0.2354
+    },
+    {
+      "beat": 50.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 51,
+      "midi": 60,
+      "dur": 0.2354
+    },
+    {
+      "beat": 51.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 51.5,
+      "midi": 60,
+      "dur": 0.2354
+    },
+    {
+      "beat": 51.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 52,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 52.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 52.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 52.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 53,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 53.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 53.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 53.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 54,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 54.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 54.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 54.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 55,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 55.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 55.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 55.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 56,
+      "midi": 60,
+      "dur": 0.2354
+    },
+    {
+      "beat": 56.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 56.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 56.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 57,
+      "midi": 57,
+      "dur": 0.2354
+    },
+    {
+      "beat": 57.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 57.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 57.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 58,
+      "midi": 60,
+      "dur": 0.2354
+    },
+    {
+      "beat": 58.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 58.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 58.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 59,
+      "midi": 60,
+      "dur": 0.2354
+    },
+    {
+      "beat": 59.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 59.5,
+      "midi": 57,
+      "dur": 0.2354
+    },
+    {
+      "beat": 59.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 60,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 60.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 60.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 60.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 61,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 61.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 61.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 61.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 62,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 62.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 62.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 62.75,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 63,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 63.25,
+      "midi": 62,
+      "dur": 0.2354
+    },
+    {
+      "beat": 63.5,
+      "midi": 59,
+      "dur": 0.2354
+    },
+    {
+      "beat": 63.75,
+      "midi": 62,
+      "dur": 0.2354
+    }
+  ]
+}
