@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Robin Score · Robin Blocks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --ink: #f0f4fa;
+    --ink-2: #b6c2d8;
+    --ink-3: #7d8aa3;
+    --chrome: rgba(255,255,255,0.08);
+    --chrome-hover: rgba(255,255,255,0.16);
+    --chrome-border: rgba(255,255,255,0.12);
+    --accent: #56B4E9;
+    --miss: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: var(--ink);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    touch-action: none;
+  }
+
+  /* Painterly moonlit backdrop, dimmed so circles pop. Procedural (CSS)
+     stand-in for the spec's generated art — drop a real image in later. */
+  #backdrop {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 18%, rgba(120,150,210,0.30), transparent 70%),
+      radial-gradient(circle at 76% 22%, rgba(220,225,255,0.55), rgba(180,195,240,0.10) 22%, transparent 40%),
+      radial-gradient(ellipse 90% 70% at 50% 110%, rgba(40,30,70,0.55), transparent 60%),
+      linear-gradient(180deg, #0c1330 0%, #131a3a 38%, #1a1733 70%, #0a0a16 100%);
+    filter: saturate(0.85) brightness(0.92);
+  }
+  #backdrop::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 50% 55%, transparent 40%, rgba(5,6,14,0.55) 100%);
+  }
+
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; z-index: 10; pointer-events: none;
+  }
+  .topbar > * { pointer-events: auto; }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 10px;
+    color: var(--ink); background: var(--chrome);
+    border: 1px solid var(--chrome-border);
+    text-decoration: none; font-size: 13.5px; font-weight: 500;
+    letter-spacing: -0.01em; cursor: pointer;
+    transition: background .15s, border-color .15s, transform .15s;
+    backdrop-filter: blur(8px);
+  }
+  .back-btn:hover { background: var(--chrome-hover); border-color: rgba(255,255,255,0.22); }
+  .back-btn:active { transform: translateY(1px); }
+  .back-btn svg { display: block; }
+  .brand { font-size: 13.5px; color: var(--ink-2); letter-spacing: -0.01em; }
+  .brand b { color: var(--ink); font-weight: 700; }
+
+  #stage { position: fixed; inset: 0; z-index: 1; }
+  #canvas { display: block; width: 100%; height: 100%; }
+
+  .hud {
+    position: fixed; top: 58px; left: 0; right: 0;
+    z-index: 5; display: flex; align-items: flex-start;
+    justify-content: space-between; padding: 0 22px;
+    pointer-events: none;
+  }
+  .lives { display: flex; gap: 6px; padding: 8px 12px;
+    background: var(--chrome); border: 1px solid var(--chrome-border);
+    border-radius: 10px; backdrop-filter: blur(8px); }
+  .heart { width: 16px; height: 16px; border-radius: 3px;
+    background: var(--miss); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.25);
+    transition: opacity .2s, transform .3s; }
+  .heart.gone { opacity: 0.18; background: var(--ink-3); transform: scale(.85); }
+  .score-hud { padding: 8px 12px; background: var(--chrome);
+    border: 1px solid var(--chrome-border); border-radius: 10px;
+    backdrop-filter: blur(8px); font-size: 13px; color: var(--ink-2);
+    font-variant-numeric: tabular-nums; }
+  .score-hud b { color: var(--ink); font-weight: 700; }
+
+  .progress {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 5px;
+    z-index: 5; background: rgba(255,255,255,0.06);
+  }
+  .progress-fill { height: 100%; width: 0%;
+    background: linear-gradient(90deg, #56B4E9, #009E73);
+    transition: width .12s linear; }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(6, 9, 20, 0.62); backdrop-filter: blur(10px);
+    transition: opacity .2s;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: rgba(16, 22, 44, 0.86);
+    border: 1px solid var(--chrome-border);
+    border-radius: 18px; padding: 32px 36px;
+    max-width: 480px; width: calc(100% - 40px);
+    text-align: center; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.6);
+  }
+  .panel h1 { margin: 0 0 4px; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+  .panel .sub { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+  .panel .instructions {
+    text-align: left; background: rgba(0,0,0,0.22);
+    border: 1px solid var(--chrome-border); border-radius: 12px;
+    padding: 14px 16px; margin: 0 0 18px; font-size: 13.5px;
+    color: var(--ink-2); line-height: 1.6;
+  }
+  .panel .instructions b { color: var(--ink); }
+  .fingers { display: flex; gap: 8px; justify-content: space-between; margin: 10px 0 2px; }
+  .fkey { flex: 1; text-align: center; }
+  .fkey .dot { width: 22px; height: 22px; border-radius: 50%; margin: 0 auto 5px;
+    border: 2px solid rgba(0,0,0,0.35); }
+  .fkey kbd {
+    display: inline-block; padding: 1px 7px; background: rgba(255,255,255,0.1);
+    border: 1px solid var(--chrome-border); border-radius: 4px;
+    font-family: ui-monospace, monospace; font-size: 12px; color: var(--ink);
+  }
+  .fkey .fn { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 4px; }
+  .panel button {
+    display: inline-block; padding: 12px 28px; font: inherit;
+    font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+    background: var(--accent); color: #08243a;
+    border: 1px solid rgba(0,0,0,0.2); border-radius: 10px;
+    cursor: pointer; transition: transform .1s, filter .15s;
+  }
+  .panel button:hover { filter: brightness(1.06); }
+  .panel button:active { transform: translateY(1px); }
+  .panel button:disabled { opacity: 0.6; cursor: default; }
+  .panel .stats { display: flex; gap: 18px; justify-content: center;
+    margin: 0 0 18px; font-variant-numeric: tabular-nums; }
+  .panel .stat { background: rgba(0,0,0,0.22); border: 1px solid var(--chrome-border);
+    border-radius: 10px; padding: 10px 14px; min-width: 96px; }
+  .panel .stat .v { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1; }
+  .panel .stat .k { font-size: 11px; color: var(--ink-3); text-transform: uppercase;
+    letter-spacing: 0.06em; margin-top: 4px; }
+
+  .flash-red {
+    position: fixed; inset: 0; z-index: 15; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(220,30,30,0) 35%, rgba(180,10,10,0.7) 95%);
+    opacity: 0;
+  }
+  @keyframes life-flash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+  .flash-red.active { animation: life-flash 0.42s ease-out; }
+
+  @media (max-width: 600px) {
+    .topbar { padding: 8px 10px; }
+    .hud { top: 50px; padding: 0 10px; }
+    .panel { padding: 24px 22px; }
+    .panel h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div id="backdrop"></div>
+
+<div class="topbar">
+  <a class="back-btn" href="/" aria-label="Back to home">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <span>Back</span>
+  </a>
+  <div class="brand"><b>Robin Score</b> · robinblocks.com</div>
+</div>
+
+<div id="stage"><canvas id="canvas"></canvas></div>
+
+<div class="hud">
+  <div class="lives" id="lives"><span class="heart"></span><span class="heart"></span><span class="heart"></span></div>
+  <div class="score-hud"><b id="hit-count">0</b> / <span id="total-count">0</span> hit</div>
+</div>
+<div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+
+<div class="overlay" id="start-overlay">
+  <div class="panel">
+    <h1>Robin Score</h1>
+    <p class="sub">Tap the circles as the rings close in. Each finger plays the right note of Mozart's K545 — you only learn rhythm and fingering, the pitches play themselves.</p>
+    <div class="instructions">
+      <b>Five keys, five fingers of the right hand.</b> A circle's number tells you which finger; its colour matches the key. Hit it when the shrinking ring meets the circle.
+      <div class="fingers" id="finger-legend"></div>
+    </div>
+    <button id="start-btn">Start playing</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="end-overlay">
+  <div class="panel">
+    <h1 id="end-title">Complete!</h1>
+    <p class="sub" id="end-sub">Nice work.</p>
+    <div class="stats">
+      <div class="stat"><div class="v" id="end-hit">0</div><div class="k">Notes hit</div></div>
+      <div class="stat"><div class="v" id="end-acc">0%</div><div class="k">Accuracy</div></div>
+    </div>
+    <button id="replay-btn">Play again</button>
+  </div>
+</div>
+
+<div class="flash-red" id="flash-red"></div>
+
+<script type="importmap">
+{ "imports": { "pixi.js": "https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.mjs" } }
+</script>
+
+<script type="module">
+import { Application, Container, Graphics, Text } from 'pixi.js';
+
+// =========================================================================
+// Constants
+// =========================================================================
+// Okabe-Ito colourblind-safe palette. Adjacent fingers sit far apart.
+const FINGER = {
+  1: { name: 'thumb',  hex: 0xD55E00, css: '#D55E00', code: 'KeyB', key: 'B' },
+  2: { name: 'index',  hex: 0xE69F00, css: '#E69F00', code: 'KeyU', key: 'U' },
+  3: { name: 'middle', hex: 0x56B4E9, css: '#56B4E9', code: 'KeyI', key: 'I' },
+  4: { name: 'ring',   hex: 0x009E73, css: '#009E73', code: 'KeyO', key: 'O' },
+  5: { name: 'pinky',  hex: 0xCC79A7, css: '#CC79A7', code: 'KeyP', key: 'P' },
+};
+const CODE_TO_FINGER = { KeyB: 1, KeyU: 2, KeyI: 3, KeyO: 4, KeyP: 5 };
+
+const TEMPO_BPM = 84;                 // spec §3 tempo decision
+const SEC_PER_BEAT = 60 / TEMPO_BPM;
+const HIT_WINDOW = 0.15;              // ±150 ms
+const PREVIEW_LEAD = 3.0;             // s before hit: circle fades in
+const ACT_LEAD = 1.5;                 // s before hit: ring accelerates
+const SLIDER_MIN_DUR = 0.5;           // s — longer notes become sliders
+const SLIDER_EARLY_RELEASE = 0.2;     // s — release earlier than this cuts note
+const SAFE = 0.08;                    // normalized play-area margin
+const COUNT_IN_BEATS = 4;             // one 4/4 bar of lead-in
+
+function darken(hex, f = 0.65) {
+  const r = ((hex >> 16) & 255) * f, g = ((hex >> 8) & 255) * f, b = (hex & 255) * f;
+  return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+}
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// =========================================================================
+// Audio — Salamander Grand Piano via smplr (lazy CDN import)
+// =========================================================================
+const Audio = {
+  ctx: null, piano: null, loaded: false, loadingPromise: null,
+  stoppers: new Map(),
+  init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+  resume() { if (this.ctx && this.ctx.state === 'suspended') return this.ctx.resume(); },
+  loadPiano() {
+    if (this.loadingPromise) return this.loadingPromise;
+    this.init();
+    this.loadingPromise = (async () => {
+      const mod = await import('https://esm.sh/smplr@0.16.1');
+      this.piano = new mod.SplendidGrandPiano(this.ctx);
+      const ready = this.piano.load || (this.piano.loaded && this.piano.loaded());
+      if (ready && typeof ready.then === 'function') await ready;
+      this.loaded = true;
+    })().catch(err => { this.loadingPromise = null; throw err; });
+    return this.loadingPromise;
+  },
+  noteOn(midi, key, velocity = 90) {
+    if (!this.loaded || !this.piano) return;
+    const prev = this.stoppers.get(key);
+    if (prev) { try { prev(); } catch (e) {} }
+    const stopper = this.piano.start({ note: midi, velocity: Math.max(1, Math.min(127, velocity | 0)) });
+    if (typeof stopper === 'function') this.stoppers.set(key, stopper);
+  },
+  noteOff(key) {
+    const s = this.stoppers.get(key);
+    if (!s) return;
+    this.stoppers.delete(key);
+    try { s(); } catch (e) {}
+  },
+  playFor(midi, duration, velocity = 60) {
+    if (!this.loaded || !this.piano) return;
+    this.piano.start({ note: midi, velocity: Math.max(1, Math.min(127, velocity | 0)), duration });
+  },
+};
+
+// =========================================================================
+// Score loading + build-time-style preprocessing (done once at load with a
+// fixed seed, so positions are deterministic across reloads).
+// =========================================================================
+let SCORE = null;
+
+function synthVelocity(beat, rnd) {
+  // Source JSON has no velocity; synthesize a musical contour so circle
+  // size/alpha vary readably. Bar downbeats loudest, off-beats softer.
+  let v = 70;
+  if (beat % 4 === 0) v += 30;
+  else if (Number.isInteger(beat)) v += 14;
+  else if (beat % 0.5 === 0) v += 4;
+  v += Math.round((rnd() - 0.5) * 14);
+  return Math.max(30, Math.min(120, v));
+}
+
+async function loadScore() {
+  const raw = await fetch('/pieces/k545.json', { cache: 'no-cache' }).then(r => r.json());
+  const seeded = mulberry32(20260515); // fixed seed → deterministic layout
+
+  // Shift everything past a one-bar count-in, convert beats→seconds.
+  const rh = raw.rh_notes.map(n => ({
+    time: (n.beat + COUNT_IN_BEATS) * SEC_PER_BEAT,
+    midi: n.midi,
+    duration: n.dur * SEC_PER_BEAT,
+    finger: n.finger,
+    beat: n.beat,
+    velocity: synthVelocity(n.beat, seeded),
+  }));
+  const lh = raw.lh_notes.map(n => ({
+    time: (n.beat + COUNT_IN_BEATS) * SEC_PER_BEAT,
+    midi: n.midi,
+    duration: n.dur * SEC_PER_BEAT,
+    velocity: 58,
+  }));
+
+  // Constrained random walk for circle positions (spec §6). Group by onset
+  // so chords share an anchor.
+  const byTime = new Map();
+  for (const n of rh) {
+    const k = n.time.toFixed(4);
+    if (!byTime.has(k)) byTime.set(k, []);
+    byTime.get(k).push(n);
+  }
+  let px = 0.5, py = 0.5;
+  const placed = []; // {x,y,time}
+  const lo = SAFE, hi = 1 - SAFE;
+  for (const [, group] of byTime) {
+    let ax = px, ay = py, ok = false;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const ang = seeded() * Math.PI * 2;
+      const dist = 0.10 + seeded() * 0.20;
+      const cx = px + Math.cos(ang) * dist;
+      const cy = py + Math.sin(ang) * dist * 0.62; // 16:9-ish vertical squash
+      if (cx < lo || cx > hi || cy < lo || cy > hi) continue;
+      // Keep clear of circles still on screen (overlapping preview windows).
+      let clash = false;
+      for (const p of placed) {
+        if (group[0].time - p.time < PREVIEW_LEAD &&
+            Math.hypot(cx - p.x, cy - p.y) < 0.085) { clash = true; break; }
+      }
+      if (clash) continue;
+      ax = cx; ay = cy; ok = true; break;
+    }
+    if (!ok) { ax = Math.max(lo, Math.min(hi, px + (seeded() - 0.5) * 0.2));
+               ay = Math.max(lo, Math.min(hi, py + (seeded() - 0.5) * 0.2)); }
+    px = ax; py = ay;
+    placed.push({ x: ax, y: ay, time: group[0].time });
+    group.forEach((n, i) => {
+      if (group.length === 1) { n.x = ax; n.y = ay; }
+      else {
+        const a = (i / group.length) * Math.PI * 2;
+        n.x = Math.max(lo, Math.min(hi, ax + Math.cos(a) * 0.05));
+        n.y = Math.max(lo, Math.min(hi, ay + Math.sin(a) * 0.05));
+      }
+      if (n.duration > SLIDER_MIN_DUR) {
+        const a = seeded() * Math.PI * 2;
+        const len = Math.min(0.26, 0.06 + n.duration * 0.05);
+        let ex = n.x + Math.cos(a) * len, ey = n.y + Math.sin(a) * len * 0.62;
+        ex = Math.max(lo, Math.min(hi, ex)); ey = Math.max(lo, Math.min(hi, ey));
+        n.slider_path = [[n.x, n.y], [ex, ey]];
+      }
+    });
+  }
+
+  const duration = Math.max(
+    ...rh.map(n => n.time + n.duration),
+    ...lh.map(n => n.time + n.duration),
+  );
+  SCORE = { rh, lh, duration, title: raw.metadata.title };
+}
+
+// =========================================================================
+// PixiJS stage
+// =========================================================================
+const canvas = document.getElementById('canvas');
+const app = new Application();
+await app.init({ canvas, resizeTo: window, antialias: true, backgroundAlpha: 0 });
+
+const layerSliders = new Container();
+const layerCircles = new Container();
+const layerFx = new Container();
+app.stage.addChild(layerSliders, layerCircles, layerFx);
+
+// Play-area rect (inner 16:9 region of the viewport).
+let play = { x: 0, y: 0, w: 1, h: 1 };
+function computePlay() {
+  const W = app.renderer.width, H = app.renderer.height;
+  const targetAR = 16 / 9;
+  let w = W, h = W / targetAR;
+  if (h > H) { h = H; w = H * targetAR; }
+  w *= 0.92; h *= 0.92;
+  play = { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+computePlay();
+window.addEventListener('resize', () => setTimeout(computePlay, 50));
+const nx = x => play.x + x * play.w;
+const ny = y => play.y + y * play.h;
+
+// Velocity → diameter (40–110px) and alpha (0.30–1.0).
+function velRadius(v) { return (40 + ((v - 1) / 126) * 70) / 2; }
+function velAlpha(v) { return 0.30 + ((v - 1) / 126) * 0.70; }
+
+// =========================================================================
+// Game state
+// =========================================================================
+const game = {
+  state: 'menu',      // menu | playing | ended
+  startedAt: 0,
+  lives: 3,
+  hits: 0,
+  total: 0,
+  scheduledLH: 0,
+  circles: [],        // active circle objects
+  nextIdx: 0,
+};
+const handState = {};  // finger → current midi pitch
+
+function elapsed() {
+  return game.state === 'playing' ? Audio.ctx.currentTime - game.startedAt : 0;
+}
+
+// One visual+logic object per RH note.
+function makeCircle(note) {
+  const root = new Container();
+  const R = velRadius(note.velocity);
+  const col = FINGER[note.finger].hex;
+  const a = velAlpha(note.velocity);
+
+  const slider = new Graphics();
+  if (note.slider_path) layerSliders.addChild(slider);
+
+  const body = new Graphics();
+  body.circle(0, 0, R).fill({ color: col, alpha: a })
+      .circle(0, 0, R).stroke({ color: darken(col, 0.6), width: 5, alpha: Math.min(1, a + 0.2) });
+  const num = new Text({
+    text: String(note.finger),
+    style: { fontFamily: 'Inter, sans-serif', fontSize: Math.max(20, R * 0.9),
+             fontWeight: '800', fill: 0xffffff },
+  });
+  num.anchor.set(0.5);
+  const ring = new Graphics();
+  root.addChild(ring, body, num);
+  root.alpha = 0;
+  layerCircles.addChild(root);
+
+  return {
+    note, root, body, ring, slider, R, col, alpha: a,
+    state: 'preview',           // preview | act | hit | miss | sliding | done
+    resolved: false,
+    sliderHeldKey: null,
+    sliderStartT: 0,
+  };
+}
+
+function placeCircle(c) {
+  const x = nx(c.note.x), y = ny(c.note.y);
+  c.root.position.set(x, y);
+  if (c.note.slider_path) {
+    const pts = c.note.slider_path.map(([sx, sy]) => [nx(sx), ny(sy)]);
+    c.slider.clear();
+    c.slider.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) c.slider.lineTo(pts[i][0], pts[i][1]);
+    c.slider.stroke({ color: c.col, width: 9, alpha: 0.45, cap: 'round' });
+    // Beat tick marks along a straight 2-point path.
+    const beats = Math.floor(c.note.duration / SEC_PER_BEAT);
+    const [ax, ay] = pts[0], [bx, by] = pts[pts.length - 1];
+    const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+    const px2 = -dy / L, py2 = dx / L;
+    for (let b = 1; b <= beats; b++) {
+      const t = b / (beats + 1);
+      const mx = ax + dx * t, my = ay + dy * t;
+      c.slider.moveTo(mx - px2 * 10, my - py2 * 10)
+              .lineTo(mx + px2 * 10, my + py2 * 10)
+              .stroke({ color: 0xffffff, width: 2, alpha: 0.6 });
+    }
+    c.slider.alpha = 0;
+  }
+}
+
+function spawnEffect(x, y, col, kind) {
+  const g = new Graphics();
+  g.position.set(x, y);
+  layerFx.addChild(g);
+  let r = kind === 'hit' ? 8 : 4, life = 0;
+  const tick = (t) => {
+    life += t.deltaMS / 1000;
+    g.clear();
+    if (kind === 'hit') {
+      r += t.deltaMS * 0.35;
+      g.circle(0, 0, r).stroke({ color: col, width: 4, alpha: Math.max(0, 0.9 - life * 3) });
+    } else {
+      g.circle(0, 0, 30).fill({ color: 0xff3b3b, alpha: Math.max(0, 0.5 - life * 2) });
+    }
+    if (life > 0.34) { app.ticker.remove(tick); g.destroy(); }
+  };
+  app.ticker.add(tick);
+}
+
+// =========================================================================
+// Lives / HUD / end
+// =========================================================================
+function updateLives() {
+  document.querySelectorAll('#lives .heart').forEach((el, i) =>
+    el.classList.toggle('gone', i >= game.lives));
+}
+function updateScore() {
+  document.getElementById('hit-count').textContent = game.hits;
+  document.getElementById('total-count').textContent = game.total;
+}
+function flashRed() {
+  const el = document.getElementById('flash-red');
+  el.classList.remove('active'); void el.offsetWidth; el.classList.add('active');
+}
+function loseLife(reason) {
+  game.lives--;
+  updateLives();
+  flashRed();
+  if (game.lives <= 0) endGame(false);
+}
+
+function endGame(success) {
+  if (game.state === 'ended') return;
+  game.state = 'ended';
+  Audio.stoppers.forEach((s) => { try { s(); } catch (e) {} });
+  Audio.stoppers.clear();
+  const acc = game.total ? Math.round((game.hits / game.total) * 100) : 0;
+  document.getElementById('end-title').textContent = success ? 'Complete!' : 'Try again';
+  document.getElementById('end-sub').textContent = success
+    ? "You played Mozart's K545 by ear and fingering alone. Bravo."
+    : 'Out of lives — the music played on without you. One more go?';
+  document.getElementById('end-hit').textContent = game.hits;
+  document.getElementById('end-acc').textContent = acc + '%';
+  document.getElementById('end-overlay').classList.remove('hidden');
+}
+
+// =========================================================================
+// Input
+// =========================================================================
+function pressFinger(finger, code) {
+  if (game.state !== 'playing') return;
+  const t = elapsed();
+  // Active, unresolved circles within the timing window (any finger).
+  let nearest = null, nearestDt = Infinity;
+  for (const c of game.circles) {
+    if (c.resolved || (c.state !== 'act' && c.state !== 'preview')) continue;
+    const dt = Math.abs(c.note.time - t);
+    if (dt <= HIT_WINDOW && dt < nearestDt) { nearest = c; nearestDt = dt; }
+  }
+  if (!nearest) return; // no active circle in window → ignore (no sound/penalty)
+
+  if (nearest.note.finger === finger) {
+    // Correct finger → success.
+    nearest.resolved = true;
+    game.hits++;
+    updateScore();
+    handState[finger] = nearest.note.midi;
+    Audio.noteOn(nearest.note.midi, code, nearest.note.velocity);
+    spawnEffect(nearest.root.x, nearest.root.y, nearest.col, 'hit');
+    if (nearest.note.slider_path) {
+      nearest.state = 'sliding';
+      nearest.sliderHeldKey = code;
+      nearest.sliderStartT = t;
+    } else {
+      nearest.state = 'hit';
+      nearest._fade = 0;
+    }
+  } else {
+    // Wrong finger → musically wrong note + lose a life. Resolve the circle
+    // so it doesn't also charge a timing miss.
+    nearest.resolved = true;
+    nearest.state = 'miss';
+    nearest._fade = 0;
+    const wrong = handState[finger];
+    if (wrong != null) Audio.noteOn(wrong, code, 80);
+    spawnEffect(nearest.root.x, nearest.root.y, 0xff3b3b, 'miss');
+    loseLife('wrong finger');
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  if ((e.code === 'Enter' || e.code === 'Space')) {
+    const so = document.getElementById('start-overlay');
+    const eo = document.getElementById('end-overlay');
+    if (!so.classList.contains('hidden')) { e.preventDefault(); document.getElementById('start-btn').click(); return; }
+    if (!eo.classList.contains('hidden')) { e.preventDefault(); document.getElementById('replay-btn').click(); return; }
+  }
+  const f = CODE_TO_FINGER[e.code];
+  if (!f) return;
+  e.preventDefault();
+  pressFinger(f, e.code);
+});
+window.addEventListener('keyup', (e) => {
+  const f = CODE_TO_FINGER[e.code];
+  if (!f) return;
+  // Slider release handling.
+  for (const c of game.circles) {
+    if (c.state === 'sliding' && c.sliderHeldKey === e.code) {
+      const remaining = (c.note.time + c.note.duration) - elapsed();
+      if (remaining > SLIDER_EARLY_RELEASE) { /* cut short, no life lost in v1 */ }
+      c.state = 'hit'; c._fade = 0;
+    }
+  }
+  Audio.noteOff(e.code);
+});
+
+// =========================================================================
+// Main loop
+// =========================================================================
+app.ticker.add(() => {
+  if (game.state !== 'playing') return;
+  const t = elapsed();
+
+  // Spawn circles entering the preview window.
+  while (game.nextIdx < SCORE.rh.length &&
+         SCORE.rh[game.nextIdx].time - t <= PREVIEW_LEAD) {
+    const note = SCORE.rh[game.nextIdx++];
+    handState[note.finger] = note.midi; // hand-state updates as notes appear
+    const c = makeCircle(note);
+    placeCircle(c);
+    game.circles.push(c);
+  }
+
+  // LH auto-accompaniment.
+  while (game.scheduledLH < SCORE.lh.length && SCORE.lh[game.scheduledLH].time <= t + 0.05) {
+    const n = SCORE.lh[game.scheduledLH++];
+    Audio.playFor(n.midi, Math.max(0.12, n.duration * 0.95), n.velocity);
+  }
+
+  // Update circles.
+  for (let i = game.circles.length - 1; i >= 0; i--) {
+    const c = game.circles[i];
+    const dt = c.note.time - t; // seconds until press moment
+
+    if (c.state === 'preview' || c.state === 'act') {
+      // Fade in over the first 0.3 s of the preview window.
+      const into = PREVIEW_LEAD - dt;
+      c.root.alpha = Math.max(0, Math.min(1, into / 0.3));
+      if (c.slider) c.slider.alpha = c.root.alpha * 0.9;
+      if (dt <= ACT_LEAD) c.state = 'act';
+      // Approach ring radius.
+      let rr;
+      if (dt > ACT_LEAD) rr = c.R * (3.0 - 0.4 * (PREVIEW_LEAD - dt) / (PREVIEW_LEAD - ACT_LEAD));
+      else rr = c.R * (1.0 + 1.6 * Math.max(0, dt) / ACT_LEAD);
+      c.ring.clear();
+      c.ring.circle(0, 0, rr).stroke({ color: c.col, width: 4, alpha: 0.7 });
+      // Timing miss: window passed with no press.
+      if (dt < -HIT_WINDOW && !c.resolved) {
+        c.resolved = true; c.state = 'miss'; c._fade = 0;
+        loseLife('missed timing');
+      }
+    } else if (c.state === 'sliding') {
+      // Marker travels the path while the key is held.
+      const prog = Math.max(0, Math.min(1, (t - c.note.time) / c.note.duration));
+      c.ring.clear();
+      const path = c.note.slider_path;
+      const ax = nx(path[0][0]), ay = ny(path[0][1]);
+      const bx = nx(path[path.length - 1][0]), by = ny(path[path.length - 1][1]);
+      const mx = ax + (bx - ax) * prog - c.root.x;
+      const my = ay + (by - ay) * prog - c.root.y;
+      c.ring.circle(mx, my, 7).fill({ color: 0xffffff })
+            .circle(mx, my, 11).stroke({ color: c.col, width: 3, alpha: 0.8 });
+      if (t > c.note.time + c.note.duration) {
+        Audio.noteOff(c.sliderHeldKey);
+        c.state = 'hit'; c._fade = 0;
+      }
+    } else if (c.state === 'hit' || c.state === 'miss') {
+      c._fade += app.ticker.deltaMS / 1000;
+      c.root.alpha = Math.max(0, 1 - c._fade / 0.2);
+      if (c.slider) c.slider.alpha = c.root.alpha * 0.9;
+      if (c.state === 'miss') { c.body.tint = 0x888888; }
+      if (c._fade >= 0.22) {
+        c.root.destroy({ children: true });
+        if (c.slider) c.slider.destroy();
+        game.circles.splice(i, 1);
+      }
+    }
+  }
+
+  // Progress bar + end condition.
+  const pct = Math.min(100, (t / SCORE.duration) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  if (t >= SCORE.duration + 0.4 && game.circles.length === 0) endGame(true);
+});
+
+// =========================================================================
+// Start / restart
+// =========================================================================
+function resetVisuals() {
+  for (const c of game.circles) {
+    c.root.destroy({ children: true });
+    if (c.slider) c.slider.destroy();
+  }
+  game.circles.length = 0;
+  layerFx.removeChildren();
+}
+
+async function startGame() {
+  Audio.init();
+  await Audio.resume();
+  const sb = document.getElementById('start-btn');
+  const rb = document.getElementById('replay-btn');
+  if (!Audio.loaded) {
+    sb.disabled = rb.disabled = true;
+    const o1 = sb.textContent, o2 = rb.textContent;
+    sb.textContent = rb.textContent = 'Loading piano…';
+    try { await Audio.loadPiano(); }
+    catch (e) { sb.textContent = rb.textContent = 'Load failed — retry'; sb.disabled = rb.disabled = false; return; }
+    sb.textContent = o1; rb.textContent = o2; sb.disabled = rb.disabled = false;
+  }
+  resetVisuals();
+  computePlay();
+  game.state = 'playing';
+  game.lives = 3;
+  game.hits = 0;
+  game.total = SCORE.rh.length;
+  game.scheduledLH = 0;
+  game.nextIdx = 0;
+  for (const f of [1, 2, 3, 4, 5]) handState[f] = null;
+  updateLives();
+  updateScore();
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('start-overlay').classList.add('hidden');
+  document.getElementById('end-overlay').classList.add('hidden');
+  // Lead-in so the first circle has its full preview window.
+  game.startedAt = Audio.ctx.currentTime + PREVIEW_LEAD + 0.3;
+}
+
+// =========================================================================
+// Boot
+// =========================================================================
+(function buildLegend() {
+  const el = document.getElementById('finger-legend');
+  el.innerHTML = [1, 2, 3, 4, 5].map(f => `
+    <div class="fkey">
+      <div class="dot" style="background:${FINGER[f].css}"></div>
+      <kbd>${FINGER[f].key}</kbd>
+      <span class="fn">${f}·${FINGER[f].name}</span>
+    </div>`).join('');
+})();
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('replay-btn').addEventListener('click', startGame);
+
+await loadScore();
+document.getElementById('total-count').textContent = SCORE.rh.length;
+// Warm the piano in the background so Start is instant on most visits.
+Audio.loadPiano().catch(() => {});
+</script>
+</body>
+</html>

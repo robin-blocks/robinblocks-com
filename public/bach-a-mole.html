@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Bach-a-Mole</title>
+<link rel="preload" as="image" href="/assets/bach-mole-happy.png" />
+<link rel="preload" as="image" href="/assets/bach-mole-sad.png" />
+<style>
+  :root {
+    --badge: #f0921e;
+    --badge-dk: #c9700a;
+    --panel: #f4f7fb;
+    --panel-line: #b9c6d6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #1b2a36;
+    font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+  }
+  #wrap {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #stage {
+    position: relative;
+    width: min(100vw, calc(100vh * 4 / 3));
+    height: min(75vw, 100vh);
+    background: #8fd0ef;
+    overflow: hidden;
+  }
+
+  /* ---- Scenery (SVG behind the play field) ---- */
+  #scenery { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .sky-title {
+    position: absolute; top: clamp(86px, 16%, 116px); left: 50%; z-index: 2;
+    transform: translateX(-50%);
+    color: #79b9d8;
+    font-family: 'Cooper Black', 'Comic Sans MS', 'Chalkboard SE', cursive;
+    font-size: clamp(42px, 6vw, 70px); font-weight: 900; line-height: .9;
+    letter-spacing: .01em; white-space: nowrap;
+    -webkit-text-stroke: clamp(3px, .55vw, 6px) rgba(255,255,255,.96);
+    paint-order: stroke fill;
+    text-shadow:
+      -6px 0 0 rgba(255,255,255,.72),
+      6px 0 0 rgba(255,255,255,.72),
+      0 -5px 0 rgba(255,255,255,.72),
+      0 6px 0 rgba(255,255,255,.72),
+      0 9px 0 rgba(93,154,187,.2);
+    pointer-events: none;
+  }
+
+  /* ---- HUD ---- */
+  .hud { position: absolute; top: 0; left: 0; right: 0; display: flex;
+         justify-content: space-between; align-items: flex-start;
+         padding: clamp(8px, 1.6vw, 18px); pointer-events: none; z-index: 6; }
+  .hud-col { display: flex; flex-direction: column; gap: clamp(6px,1vw,10px); }
+  .hud-col.right { align-items: flex-end; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 2px solid var(--panel-line);
+    border-radius: 12px; padding: clamp(5px,0.9vw,9px) clamp(9px,1.3vw,14px);
+    box-shadow: 0 2px 0 rgba(0,0,0,.08);
+    font-weight: 700; color: #33414f;
+    font-size: clamp(13px, 1.9vw, 22px); line-height: 1;
+  }
+  .badge .val {
+    background: var(--badge); color: #fff; border-radius: 8px;
+    padding: 4px 12px; min-width: 38px; text-align: center;
+    box-shadow: inset 0 -2px 0 var(--badge-dk);
+    font-variant-numeric: tabular-nums;
+  }
+  .lives {
+    display: inline-flex; align-items: center; gap: clamp(2px, .4vw, 5px);
+  }
+  .life-heart {
+    width: clamp(20px, 2.8vw, 32px); height: auto; display: block;
+    filter: drop-shadow(0 1px 0 rgba(80,20,10,.28));
+    transition: opacity .18s, filter .18s, transform .18s;
+  }
+  .life-heart.lost {
+    opacity: .18; filter: grayscale(1); transform: scale(.88);
+  }
+  /* subtle heartbreak when a life is lost: a throb, a shudder, then it drains
+     and drops into the greyed-out lost state */
+  @keyframes heartbreak {
+    0%   { transform: scale(1) rotate(0); opacity: 1; filter: drop-shadow(0 1px 0 rgba(80,20,10,.28)); }
+    14%  { transform: scale(1.28) rotate(0); filter: drop-shadow(0 0 6px #ff3b3b); }
+    30%  { transform: scale(1.08) rotate(-13deg); }
+    44%  { transform: scale(1.04) rotate(11deg); }
+    58%  { transform: scale(1) rotate(-7deg); opacity: .9; }
+    72%  { transform: translateY(2px) scale(.97) rotate(5deg); opacity: .7; }
+    100% { transform: translateY(6px) scale(.88) rotate(0); opacity: .18; filter: grayscale(1); }
+  }
+  .life-heart.breaking { animation: heartbreak .6s cubic-bezier(.36,.07,.19,.97) both; }
+  @media (prefers-reduced-motion: reduce) { .life-heart.breaking { animation: none; } }
+
+  /* ---- Hint / status banner ---- */
+  #hint {
+    position: absolute; top: clamp(58px, 9vw, 96px); left: 50%; transform: translateX(-50%);
+    z-index: 6; pointer-events: none;
+    background: rgba(20,30,40,.55); color: #fff; backdrop-filter: blur(2px);
+    padding: 6px 18px; border-radius: 999px; font-weight: 700;
+    font-size: clamp(13px, 2vw, 22px); white-space: nowrap;
+    opacity: 0; transition: opacity .25s;
+  }
+  #hint.show { opacity: 1; }
+  #hint.listen { background: rgba(40,80,150,.72); }
+  #hint.your-turn { background: rgba(40,140,70,.78); }
+
+  /* ---- Mole grid ---- */
+  #grid {
+    position: absolute; left: 50%; bottom: 2.5%; transform: translateX(-50%);
+    width: 78%; height: 64%;
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    gap: 0; z-index: 4;
+  }
+  .cell { position: relative; display: flex; align-items: flex-end; justify-content: center; }
+
+  /* hole = dirt ellipse; mole emerges from inside it */
+  .hole { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%);
+          width: 64%; height: 34%; }
+  .hole .dirt-back {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 38%, #3a2516 0%, #4a3018 55%, #5c3d1f 100%);
+    border-radius: 50%;
+    box-shadow: inset 0 6px 10px rgba(0,0,0,.55);
+  }
+  /* clip mask: mole only visible above the hole's mid-line */
+  .mole-clip {
+    position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%);
+    width: 88%; height: 500%;
+    overflow: hidden; pointer-events: none;
+  }
+  .mole {
+    position: absolute; left: 50%; bottom: 0; width: 140%;
+    transform: translate(-50%, 110%);
+    transition: transform .16s cubic-bezier(.34,1.56,.64,1);
+    will-change: transform;
+  }
+  .cell.up .mole { transform: translate(-50%, 6%); }
+  .cell.hit .mole-clip, .cell.sad .mole-clip { width: 150%; }
+  .cell.hit .mole, .cell.sad .mole { width: 82%; }
+  .cell.hit .mole, .cell.sad .mole { transform: translate(-50%, 6%); }
+  .mole img { width: 100%; height: auto; display: block; filter: drop-shadow(0 4px 4px rgba(0,0,0,.25)); }
+  /* front lip of dirt drawn over the mole's base */
+  .hole .dirt-front {
+    position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%);
+    width: 70%; height: 18%;
+    background: radial-gradient(ellipse at 50% 40%, #6b481f 0%, #5c3d1f 70%, #4a3018 100%);
+    border-radius: 50%; z-index: 3;
+  }
+  .keycap {
+    position: absolute; left: 50%; bottom: 12%; transform: translateX(-50%) rotate(-2deg);
+    z-index: 5; color: #d8aa72;
+    font-family: 'Comic Sans MS', 'Bradley Hand', 'Chalkboard SE', cursive;
+    font-weight: 800; font-size: clamp(24px, 3.6vw, 42px); line-height: .85;
+    opacity: 0; transition: opacity .16s;
+    text-shadow: 0 2px 0 rgba(54,29,12,.65), 1px 0 0 rgba(54,29,12,.45);
+  }
+  #stage.show-keys .keycap { opacity: .9; }
+  #stage.show-keys .cell.up .keycap { opacity: 0; transition: none; }
+  .cell.flash-wrong .hole .dirt-back { box-shadow: inset 0 0 0 4px #e0463c, inset 0 6px 10px rgba(0,0,0,.55); }
+
+  /* confetti burst on the last mole of the bar */
+  .confetti-layer { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 7; pointer-events: none; }
+  .confetti { position: absolute; left: 0; top: 0; width: clamp(7px, 0.9vw, 11px); height: clamp(11px, 1.4vw, 16px);
+              border-radius: 2px; will-change: transform, opacity; }
+
+  /* ---- Overlays ---- */
+  .overlay {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: #fff; padding: 24px;
+    background: radial-gradient(ellipse at 50% 35%, rgba(20,40,60,.55), rgba(10,20,30,.82));
+    backdrop-filter: blur(2px);
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 { margin: 0 0 6px; font-size: clamp(30px, 6vw, 64px);
+    text-shadow: 0 3px 0 rgba(0,0,0,.25); letter-spacing: .5px; }
+  .overlay .composer { font-size: clamp(13px, 2.2vw, 20px); opacity: .82; margin: 0 0 18px; font-style: italic; }
+  .overlay p { max-width: 540px; font-size: clamp(13px, 2vw, 18px); line-height: 1.5; opacity: .92; margin: 6px 0; }
+  .keys-legend { display: flex; gap: 5px; margin: 16px 0 6px; }
+  .keys-legend .kg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .keys-legend kbd {
+    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    background: #fff; color: #2a3744; border-radius: 6px; font-weight: 800;
+    font-family: inherit; box-shadow: 0 2px 0 rgba(0,0,0,.3); font-size: 15px;
+  }
+  .input-picker {
+    display: flex; align-items: center; gap: 5px; margin-top: 10px;
+    padding: 4px; border-radius: 999px; background: rgba(15,25,35,.42);
+  }
+  .input-option {
+    border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer;
+    background: transparent; color: rgba(255,255,255,.78);
+    font: inherit; font-size: 13px; font-weight: 800;
+  }
+  .input-option.selected { background: #fff; color: #33414f; box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+  .btn {
+    margin-top: 20px; cursor: pointer; border: none;
+    background: var(--badge); color: #fff; font-weight: 800; font-family: inherit;
+    font-size: clamp(16px, 2.6vw, 24px); padding: 12px 36px; border-radius: 14px;
+    box-shadow: 0 4px 0 var(--badge-dk); transition: transform .08s, box-shadow .08s;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--badge-dk); }
+  .btn[disabled] { opacity: .6; cursor: default; }
+  .final-score { font-size: clamp(20px, 4vw, 36px); font-weight: 800; margin: 14px 0 0; }
+  .final-score .v { color: #ffd166; }
+  .new-high { color: #7CFFB2; font-weight: 800; margin-top: 6px; }
+  .new-high.hidden { display: none; }
+  .home-link { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 11;
+    color: rgba(255,255,255,.7); text-decoration: none; font-size: 13px; }
+
+  /* ---- Phone layouts ---- */
+  @media (max-width: 700px) and (orientation: portrait) {
+    #stage { width: 100vw; height: 100vh; height: 100svh; }
+    .hud { padding: 8px; }
+    .hud-col { gap: 6px; }
+    .badge { gap: 6px; border-width: 1px; border-radius: 9px; padding: 5px 7px; font-size: 13px; }
+    .badge .val { min-width: 28px; padding: 3px 7px; border-radius: 6px; }
+    .life-heart { width: 20px; }
+    .home-link { top: 6px; font-size: 11px; }
+    .sky-title { top: 128px; font-size: clamp(38px, 11vw, 50px); }
+    #hint { top: 82px; max-width: calc(100% - 20px); padding: 6px 12px; font-size: 14px;
+            overflow: hidden; text-overflow: ellipsis; }
+    #grid { width: 96%; height: 62%; bottom: 1.5%; }
+    .hole { width: 76%; height: 32%; }
+    .keycap { bottom: 11%; font-size: clamp(27px, 9vw, 38px); }
+    .overlay { justify-content: center; padding: 14px; overflow-y: auto; }
+    .overlay h1 { font-size: clamp(34px, 11vw, 48px); }
+    .overlay .composer { margin-bottom: 10px; font-size: 13px; }
+    .overlay p { max-width: 360px; margin: 4px 0; font-size: 13px; line-height: 1.35; }
+    .keys-legend { margin: 11px 0 4px; }
+    .keys-legend kbd { width: 27px; height: 27px; font-size: 13px; }
+    .input-picker { margin-top: 7px; }
+    .input-option { padding: 5px 9px; font-size: 12px; }
+    .btn { margin-top: 13px; padding: 10px 28px; font-size: 18px; }
+  }
+
+  @media (max-height: 540px) and (orientation: landscape) {
+    #stage { width: 100vw; height: 100vh; height: 100svh; }
+    .hud { padding: 6px 8px; }
+    .hud-col { gap: 5px; }
+    .badge { gap: 6px; border-width: 1px; border-radius: 8px; padding: 4px 7px; font-size: 13px; }
+    .badge .val { min-width: 26px; padding: 3px 7px; border-radius: 6px; }
+    .life-heart { width: 19px; }
+    .home-link { top: 5px; font-size: 11px; }
+    .sky-title { top: 70px; font-size: clamp(34px, 6.5vw, 52px); }
+    #hint { top: 52px; padding: 5px 13px; font-size: 14px; }
+    #grid { width: 76%; height: 73%; bottom: 1%; }
+    .hole { width: 68%; height: 32%; }
+    .keycap { bottom: 11%; font-size: clamp(23px, 4vw, 34px); }
+    .overlay { padding: 8px 16px; }
+    .overlay h1 { margin-bottom: 2px; font-size: 32px; }
+    .overlay .composer { margin-bottom: 4px; font-size: 12px; }
+    .overlay p { max-width: 620px; margin: 2px 0; font-size: 12px; line-height: 1.2; }
+    .keys-legend { margin: 6px 0 2px; }
+    .keys-legend .kg { gap: 3px; }
+    .keys-legend kbd { width: 22px; height: 22px; border-radius: 4px; font-size: 12px; }
+    .input-picker { margin-top: 4px; padding: 3px; }
+    .input-option { padding: 4px 8px; font-size: 11px; }
+    .btn { margin-top: 7px; padding: 8px 24px; border-radius: 10px; font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <svg id="scenery" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#a7e0f5"/>
+          <stop offset="1" stop-color="#d8f2fb"/>
+        </linearGradient>
+        <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#86c553"/>
+          <stop offset="1" stop-color="#5fa337"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="800" height="600" fill="url(#sky)"/>
+      <!-- clouds -->
+      <g fill="#ffffff" opacity="0.95">
+        <ellipse cx="150" cy="90" rx="70" ry="34"/>
+        <ellipse cx="210" cy="105" rx="60" ry="30"/>
+        <ellipse cx="100" cy="110" rx="48" ry="26"/>
+        <ellipse cx="620" cy="70" rx="80" ry="36"/>
+        <ellipse cx="690" cy="88" rx="58" ry="28"/>
+        <ellipse cx="560" cy="92" rx="46" ry="24"/>
+      </g>
+      <!-- distant hills -->
+      <path d="M0,300 Q160,225 330,290 Q520,360 800,275 L800,360 L0,360 Z" fill="#7fc6a0"/>
+      <path d="M0,330 Q220,260 430,318 Q640,372 800,315 L800,380 L0,380 Z" fill="#6fb98c"/>
+      <!-- fence -->
+      <g stroke="#9c6b34" stroke-width="11" stroke-linecap="round">
+        <line x1="40" y1="214" x2="760" y2="202"/>
+        <line x1="40" y1="246" x2="760" y2="234"/>
+      </g>
+      <g fill="#a8763c" stroke="#7e5526" stroke-width="3">
+        <rect x="120" y="178" width="20" height="104" rx="5"/>
+        <rect x="380" y="174" width="20" height="108" rx="5"/>
+        <rect x="640" y="178" width="20" height="104" rx="5"/>
+      </g>
+      <!-- grassy field -->
+      <path d="M0,258 L800,246 L800,600 L0,600 Z" fill="url(#grass)"/>
+      <ellipse cx="400" cy="430" rx="520" ry="150" fill="#79bd49" opacity="0.55"/>
+    </svg>
+
+    <div class="sky-title">Bach-a-Mole</div>
+    <a class="home-link" href="/">← back to robinblocks.com</a>
+
+    <div class="hud">
+      <div class="hud-col">
+        <div class="badge">Lives<span class="lives" id="lives-val" aria-label="3 lives"></span></div>
+        <div class="badge">Round<span class="val" id="round-val">1</span></div>
+      </div>
+      <div class="hud-col right">
+        <div class="badge">High Score<span class="val" id="high-val">0</span></div>
+        <div class="badge">Score<span class="val" id="score-val">0</span></div>
+      </div>
+    </div>
+
+    <div id="hint"></div>
+    <div id="grid"></div>
+
+    <div class="overlay" id="start-overlay">
+      <h1>Bach-a-Mole</h1>
+      <p class="composer">J.S. Bach — The Well-Tempered Clavier, Prelude No.1 in C</p>
+      <p><b>Listen</b> as the moles pop up and play Bach's phrase — then <b>whack them back</b> in the same order.</p>
+      <p>Choose a keyboard layout below. Higher notes sit higher. Get it right and Bach plays on, a little faster each time.</p>
+      <p>You have three lives. Each wrong answer costs one.</p>
+      <div class="input-picker" role="group" aria-label="Keyboard layout">
+        <button class="input-option selected" type="button" data-input-mode="numpad" aria-pressed="true">Numpad</button>
+        <button class="input-option" type="button" data-input-mode="letters" aria-pressed="false">Letter keys</button>
+      </div>
+      <div class="keys-legend">
+        <div class="kg" id="keys-grid"></div>
+      </div>
+      <button class="btn" id="start-btn" disabled>Loading piano…</button>
+    </div>
+
+    <div class="overlay hidden" id="over-overlay">
+      <h1>Game over</h1>
+      <p class="final-score">Score <span class="v" id="final-score">0</span></p>
+      <p id="reached" style="opacity:.8"></p>
+      <p class="new-high hidden" id="new-high">★ New high score! ★</p>
+      <button class="btn" id="again-btn">Play again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================================================================
+// Config
+// =========================================================================
+const CONFIG = {
+  maxLives: 3,
+  callNoteMs: 420,        // initial spacing between notes in the call
+  callNoteMin: 150,       // floor for spacing as it speeds up
+  callLeadInMs: 260,      // breathing room before a fresh or replayed call
+  speedFactor: 0.95,      // multiply spacing by this each completed round
+  moleUpRatio: 0.62,      // fraction of spacing a mole stays up during the call
+  inputBufferMs: 320,     // grace window: presses made this long before the response opens still count
+  whackUpMs: 300,         // how long a whacked (happy) mole stays up before dropping
+  celebrateUpMs: 550,     // bar-completing mole holds longer to enjoy the confetti
+  sadUpMs: 600,           // how long a missed (sad) mole stays up
+  pointsPerHit: 10,
+  roundBonus: 40,
+};
+
+// =========================================================================
+// Audio: Salamander Grand Piano via smplr (same as the other games)
+// =========================================================================
+const Audio = {
+  ctx: null, piano: null, loaded: false, loadingPromise: null,
+  init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+  resume() { if (this.ctx && this.ctx.state === 'suspended') return this.ctx.resume(); },
+  loadPiano() {
+    if (this.loadingPromise) return this.loadingPromise;
+    this.init();
+    this.loadingPromise = (async () => {
+      const mod = await import('https://esm.sh/smplr@0.16.1');
+      this.piano = new mod.SplendidGrandPiano(this.ctx);
+      const ready = this.piano.load || (this.piano.loaded && this.piano.loaded());
+      if (ready && typeof ready.then === 'function') await ready;
+      this.loaded = true;
+    })().catch(err => { console.error('Piano failed:', err); this.loadingPromise = null; throw err; });
+    return this.loadingPromise;
+  },
+  note(midi, duration = 0.6, velocity = 0.85) {
+    if (!this.loaded || !this.piano) return;
+    const vel = Math.max(1, Math.min(127, Math.round(velocity * 100)));
+    this.piano.start({ note: midi, velocity: vel, duration });
+  },
+  wrong(expectedMidi) {
+    const clashes = [-6, -2, -1, 1, 2, 6];
+    const offset = clashes[Math.floor(Math.random() * clashes.length)];
+    this.note(expectedMidi + offset, 0.55, 0.95);
+  },
+};
+
+// =========================================================================
+// Mole sprite + grid
+// =========================================================================
+const INPUT_LAYOUTS = {
+  numpad: [
+    ['7', 'Digit7', 'Numpad7'], ['8', 'Digit8', 'Numpad8'], ['9', 'Digit9', 'Numpad9'],
+    ['4', 'Digit4', 'Numpad4'], ['5', 'Digit5', 'Numpad5'], ['6', 'Digit6', 'Numpad6'],
+    ['1', 'Digit1', 'Numpad1'], ['2', 'Digit2', 'Numpad2'], ['3', 'Digit3', 'Numpad3'],
+  ],
+  letters: [
+    ['Q', 'KeyQ'], ['W', 'KeyW'], ['E', 'KeyE'],
+    ['A', 'KeyA'], ['S', 'KeyS'], ['D', 'KeyD'],
+    ['Z', 'KeyZ'], ['X', 'KeyX'], ['C', 'KeyC'],
+  ],
+};
+let inputMode = 'numpad';
+
+const gridEl = document.getElementById('grid');
+const cellEls = [];
+const MOLE_SPRITES = {
+  neutral: '/assets/bach-mole.png',
+  happy: '/assets/bach-mole-happy.png',
+  sad: '/assets/bach-mole-sad.png',
+};
+for (let i = 0; i < 9; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.dataset.cell = i;
+  cell.innerHTML = `
+    <div class="hole">
+      <div class="dirt-back"></div>
+      <div class="mole-clip"><div class="mole"><img src="${MOLE_SPRITES.neutral}" alt=""></div></div>
+      <div class="dirt-front"></div>
+    </div>
+    <div class="keycap"></div>`;
+  gridEl.appendChild(cell);
+  cellEls.push(cell);
+}
+
+const keysGridEl = document.getElementById('keys-grid');
+const inputOptionEls = [...document.querySelectorAll('.input-option')];
+function setInputMode(mode) {
+  inputMode = mode;
+  const labels = INPUT_LAYOUTS[mode].map(([label]) => label);
+  cellEls.forEach((cell, i) => { cell.querySelector('.keycap').textContent = labels[i]; });
+  keysGridEl.innerHTML = labels.map(label => `<kbd>${label}</kbd>`).join('');
+  inputOptionEls.forEach(option => {
+    const selected = option.dataset.inputMode === mode;
+    option.classList.toggle('selected', selected);
+    option.setAttribute('aria-pressed', String(selected));
+  });
+}
+function inputCell(e) {
+  return INPUT_LAYOUTS[inputMode].findIndex(([, ...codes]) => codes.includes(e.code));
+}
+setInputMode(inputMode);
+
+// =========================================================================
+// Deterministic per-round helpers
+// =========================================================================
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Assign each distinct pitch in the figure to a grid cell, by register:
+// lowest pitch -> bottom row, highest -> top row. Columns vary per round.
+function assignCells(figure, seed) {
+  const distinct = [...new Set(figure)].sort((a, b) => a - b);
+  const n = distinct.length;
+  const rng = mulberry32(seed);
+  const used = new Set();
+  const map = new Map();
+  const pick = (desiredRow) => {
+    const rows = [desiredRow, desiredRow + 1, desiredRow - 1, desiredRow + 2, desiredRow - 2]
+      .filter(r => r >= 0 && r <= 2);
+    for (const r of rows) {
+      const cols = [0, 1, 2].sort(() => rng() - 0.5);
+      for (const c of cols) {
+        const idx = r * 3 + c;
+        if (!used.has(idx)) { used.add(idx); return idx; }
+      }
+    }
+    for (let i = 0; i < 9; i++) if (!used.has(i)) { used.add(i); return i; }
+    return 0;
+  };
+  distinct.forEach((p, i) => {
+    const desiredRow = n === 1 ? 1 : Math.round((1 - i / (n - 1)) * 2); // i=0 (low) -> row2 bottom
+    map.set(p, pick(desiredRow));
+  });
+  return map;
+}
+
+// =========================================================================
+// Game state
+// =========================================================================
+let PIECE = null;
+const S = {
+  state: 'idle',          // idle | call | response | between | over
+  score: 0,
+  high: +(localStorage.getItem('bachamole_high') || 0),
+  measureIndex: 0,
+  roundNumber: 0,
+  spacing: CONFIG.callNoteMs,
+  round: null,            // { figure:[midi], cells:[idx], expIdx }
+  token: 0,               // cancels stale async sequences
+  lives: CONFIG.maxLives,
+  inputBuffer: [],        // anticipation presses during the call, flushed at response start
+};
+
+const el = {
+  lives: document.getElementById('lives-val'),
+  round: document.getElementById('round-val'),
+  score: document.getElementById('score-val'),
+  high: document.getElementById('high-val'),
+  hint: document.getElementById('hint'),
+  startOverlay: document.getElementById('start-overlay'),
+  overOverlay: document.getElementById('over-overlay'),
+  startBtn: document.getElementById('start-btn'),
+  againBtn: document.getElementById('again-btn'),
+  finalScore: document.getElementById('final-score'),
+  reached: document.getElementById('reached'),
+  newHigh: document.getElementById('new-high'),
+  stage: document.getElementById('stage'),
+};
+el.high.textContent = S.high;
+
+function renderLives(breakIndex = -1) {
+  el.lives.setAttribute('aria-label', `${S.lives} ${S.lives === 1 ? 'life' : 'lives'}`);
+  el.lives.innerHTML = Array.from({ length: CONFIG.maxLives }, (_, i) =>
+    `<img class="life-heart${i >= S.lives ? ' lost' : ''}" src="/assets/heart-life.png" alt="">`
+  ).join('');
+  // Play the heartbreak animation on the heart that was just lost.
+  if (breakIndex >= 0) {
+    const heart = el.lives.children[breakIndex];
+    if (heart) heart.classList.add('breaking');
+  }
+}
+renderLives();
+
+function setHint(text, cls) {
+  el.hint.textContent = text;
+  el.hint.className = 'show' + (cls ? ' ' + cls : '');
+}
+function hideHint() { el.hint.className = ''; }
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function setMoleSprite(cell, mood) {
+  cellEls[cell].querySelector('.mole img').src = MOLE_SPRITES[mood];
+}
+// Override the rise/fall transition duration for one cell (''/null restores
+// the bouncy CSS default used for whacks).
+function setPopDuration(cell, ms) {
+  cellEls[cell].querySelector('.mole').style.transitionDuration = ms == null ? '' : ms + 'ms';
+}
+function popUp(cell) {
+  clearTimeout(cellEls[cell].reactionTimer);
+  setPopDuration(cell, null);
+  setMoleSprite(cell, 'neutral');
+  cellEls[cell].classList.add('up');
+  cellEls[cell].classList.remove('hit', 'sad');
+}
+function popDown(cell) {
+  clearTimeout(cellEls[cell].reactionTimer);
+  cellEls[cell].classList.remove('up', 'hit', 'sad');
+  setMoleSprite(cell, 'neutral');
+}
+function reactionDown(cell, delay) {
+  const c = cellEls[cell];
+  clearTimeout(c.reactionTimer);
+  c.reactionTimer = setTimeout(() => popDown(cell), delay);
+}
+// One self-contained pop during the call: rise, hold, then fall — all driven by
+// its own timer so the whole cycle finishes inside the note's time slot. This
+// guarantees the mole is back down before the same note can play again, however
+// fast the ramp gets. Returns nothing; the fall is automatic.
+function popBob(cell, riseMs, holdMs) {
+  const c = cellEls[cell];
+  clearTimeout(c.reactionTimer);
+  setPopDuration(cell, riseMs);
+  setMoleSprite(cell, 'neutral');
+  c.classList.remove('hit', 'sad');
+  c.classList.add('up');
+  c.reactionTimer = setTimeout(() => c.classList.remove('up'), riseMs + holdMs);
+}
+function whackMole(cell, upMs = CONFIG.whackUpMs) {
+  const c = cellEls[cell];
+  clearTimeout(c.reactionTimer);
+  setPopDuration(cell, null);
+  setMoleSprite(cell, 'happy');
+  const fire = () => {
+    c.classList.add('up', 'hit');
+    c.reactionTimer = setTimeout(() => popDown(cell), upMs);
+  };
+  // If this mole is still up from the previous hit (a repeated note in the
+  // figure), drop it for a frame so the second whack visibly re-pops and its
+  // hide timer restarts cleanly instead of sticking up.
+  if (c.classList.contains('up')) {
+    c.classList.remove('up', 'hit', 'sad');
+    requestAnimationFrame(() => requestAnimationFrame(fire));
+  } else {
+    c.classList.remove('hit', 'sad');
+    fire();
+  }
+}
+function sadMole(cell) {
+  const c = cellEls[cell];
+  setPopDuration(cell, null);
+  setMoleSprite(cell, 'sad');
+  c.classList.add('up', 'sad');
+  reactionDown(cell, CONFIG.sadUpMs);
+}
+const CONFETTI_COLORS = ['#f0921e', '#ffd166', '#7CFFB2', '#5ec5ff', '#ff6b9d', '#c08bff', '#ffffff'];
+function confettiBurst(cell) {
+  const layer = document.createElement('div');
+  layer.className = 'confetti-layer';
+  cellEls[cell].appendChild(layer);
+  const parts = [];
+  const N = 22;
+  for (let i = 0; i < N; i++) {
+    const el = document.createElement('i');
+    el.className = 'confetti';
+    el.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    layer.appendChild(el);
+    // Tight upward cone so it erupts out of the hole like a fountain, then
+    // gravity rains the pieces back down onto the mole.
+    const ang = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.7;
+    const speed = 4 + Math.random() * 3;
+    parts.push({ el, x: (Math.random() - 0.5) * 30, y: 0,
+      vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed - 2.5,
+      rot: Math.random() * 360, vr: (Math.random() - 0.5) * 34 });
+  }
+  let frame = 0;
+  const LIFE = 40;
+  (function step() {
+    frame++;
+    for (const p of parts) {
+      p.vy += 0.42;            // gravity — snappy rain so it lands while he's up
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      p.el.style.transform = `translate(${p.x}px, ${p.y}px) rotate(${p.rot}deg)`;
+      p.el.style.opacity = String(Math.max(0, 1 - frame / LIFE));
+    }
+    if (frame < LIFE) requestAnimationFrame(step);
+    else layer.remove();
+  })();
+}
+function flashWrong(cell) {
+  const c = cellEls[cell];
+  c.classList.add('flash-wrong');
+  setTimeout(() => c.classList.remove('flash-wrong'), 280);
+}
+
+// =========================================================================
+// Round flow
+// =========================================================================
+function buildRound() {
+  const measures = PIECE.measures;
+  const m = measures[S.measureIndex % measures.length];
+  const bass = m.bass || [];
+  const figure = bass.length ? [bass[0], ...m.figure] : m.figure.slice();
+  const map = assignCells(figure, S.roundNumber + 1);
+  const cells = figure.map(p => map.get(p));
+  S.round = { figure, cells, bass: bass.slice(1), expIdx: 0 };
+}
+
+async function playCall(leadInMs = CONFIG.callLeadInMs) {
+  S.state = 'call';
+  S.inputBuffer = [];
+  const my = ++S.token;
+  // Clean slate: clear any lingering happy/sad moles from the previous round's
+  // whacks so nothing is still up when this call starts.
+  cellEls.forEach((_, i) => popDown(i));
+  buildRound();
+  el.round.textContent = S.roundNumber + 1;
+  setHint('🎵 Listen…', 'listen');
+
+  // soft harmonic bass under the phrase
+  if (S.round.bass.length) S.round.bass.forEach(b => Audio.note(b, 1.4, 0.4));
+  if (leadInMs > 0) {
+    await sleep(leadInMs);
+    if (my !== S.token) return;
+  }
+
+  const slot = S.spacing;
+  // Size the rise/fall so the whole up-and-down (rise + hold + fall) fits inside
+  // one note's slot with a little slack. Because each mole finishes its cycle
+  // within its own slot, a repeated note always finds the mole already back down
+  // — no leftover pop bleeding into the second hit, no matter how fast we ramp.
+  const riseMs = Math.min(150, Math.max(70, slot * CONFIG.moleUpRatio * 0.5));
+  const holdMs = Math.max(0, slot - 2 * riseMs - 20);
+  const last = S.round.cells.length - 1;
+  // Anchor every note to an absolute grid time (startAt + i*slot) so the call
+  // holds tempo exactly across its length — sequential awaits would accumulate
+  // timer slop and make the phrase drag.
+  const startAt = performance.now();
+  for (let i = 0; i < S.round.cells.length; i++) {
+    const wait = startAt + i * slot - performance.now();
+    if (wait > 0) await sleep(wait);
+    if (my !== S.token) return;
+    popBob(S.round.cells[i], riseMs, holdMs);
+    Audio.note(S.round.figure[i], 0.5, 0.8);
+    if (i === last) break;   // instant handoff; this mole drops on its own timer
+  }
+  if (my !== S.token) return;
+  startResponse();
+}
+
+function startResponse() {
+  S.state = 'response';
+  S.round.expIdx = 0;
+  setHint('Your turn — whack it back!', 'your-turn');
+  // Flush anticipation presses made in the final moments of the call so a key
+  // hit a hair early still lands instead of being swallowed by the handoff.
+  if (S.inputBuffer.length) {
+    const now = performance.now();
+    const buffered = S.inputBuffer.filter(p => now - p.time <= CONFIG.inputBufferMs);
+    S.inputBuffer = [];
+    for (const p of buffered) {
+      if (S.state !== 'response') break;
+      handleCell(p.cell);
+    }
+  }
+}
+
+function handleCell(cell) {
+  if (S.state !== 'response') return;
+  const r = S.round;
+  if (cell === r.cells[r.expIdx]) {
+    Audio.note(r.figure[r.expIdx], 0.45, 0.95);
+    S.score += CONFIG.pointsPerHit;
+    el.score.textContent = S.score;
+    r.expIdx++;
+    const done = r.expIdx >= r.cells.length;
+    // The bar-completing mole stays up a touch longer so the confetti rains on
+    // him (capped by the next call's reset, so the pulse stays seamless).
+    whackMole(cell, done ? CONFIG.celebrateUpMs : CONFIG.whackUpMs);
+    if (done) {
+      confettiBurst(cell);
+      roundComplete();
+    }
+  } else {
+    Audio.wrong(r.figure[r.expIdx]);
+    sadMole(cell);
+    flashWrong(cell);
+    S.lives--;
+    renderLives(S.lives);   // animate the heart that just broke
+    if (S.lives <= 0) {
+      gameOver();
+      return;
+    }
+    // forgiving: replay the phrase so they can try again
+    S.state = 'between';
+    setHint(`Not quite — ${S.lives} ${S.lives === 1 ? 'life' : 'lives'} left`, 'listen');
+    setTimeout(() => { if (S.state === 'between') playCall(); }, 750);
+  }
+}
+
+function roundComplete() {
+  S.state = 'between';
+  S.score += CONFIG.roundBonus;
+  el.score.textContent = S.score;
+  setHint('✓ Nice! +' + CONFIG.roundBonus, 'your-turn');
+  // Continue the pulse: the next bar's call starts exactly one slot after the
+  // player's final response note, so an in-tempo player hears call → response →
+  // next call as one unbroken stream of sixteenths with no gap between bars.
+  const nextCallDelay = S.spacing;
+  S.spacing = Math.max(CONFIG.callNoteMin, S.spacing * CONFIG.speedFactor);
+  S.measureIndex++;
+  S.roundNumber++;
+  setTimeout(() => { if (S.state === 'between') playCall(0); }, nextCallDelay);
+}
+
+function gameOver() {
+  S.state = 'over';
+  S.token++;
+  cellEls.forEach((_, i) => popDown(i));
+  hideHint();
+  el.finalScore.textContent = S.score;
+  el.reached.textContent = `You reached bar ${Math.min(S.measureIndex + 1, PIECE.measures.length)} of ${PIECE.measures.length}.`;
+  const isHigh = S.score > S.high;
+  if (isHigh) {
+    S.high = S.score;
+    localStorage.setItem('bachamole_high', String(S.high));
+    el.high.textContent = S.high;
+  }
+  el.newHigh.classList.toggle('hidden', !isHigh);
+  el.overOverlay.classList.remove('hidden');
+}
+
+// =========================================================================
+// Start / restart
+// =========================================================================
+function startGame() {
+  Audio.resume();
+  S.state = 'between';
+  S.score = 0; S.measureIndex = 0; S.roundNumber = 0;
+  S.spacing = CONFIG.callNoteMs;
+  S.lives = CONFIG.maxLives;
+  S.token++;
+  el.score.textContent = '0';
+  el.round.textContent = '1';
+  renderLives();
+  el.startOverlay.classList.add('hidden');
+  el.overOverlay.classList.add('hidden');
+  el.stage.classList.add('show-keys');
+  setTimeout(playCall, 400);
+}
+
+// =========================================================================
+// Input
+// =========================================================================
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Enter' && S.state === 'over') {
+    e.preventDefault();
+    el.againBtn.click();
+    return;
+  }
+  const cell = inputCell(e);
+  if (cell < 0) return;
+  e.preventDefault();
+  if (e.repeat) return;
+  if (S.state === 'idle' || S.state === 'over') return;
+  if (S.state === 'call') {
+    // Don't drop keys pressed in the run-up to the player's turn — buffer the
+    // most recent few and let startResponse() flush those within the grace window.
+    S.inputBuffer.push({ cell, time: performance.now() });
+    if (S.inputBuffer.length > 6) S.inputBuffer.shift();
+    return;
+  }
+  handleCell(cell);
+}, { passive: false });
+
+// pointer / touch support — tap a hole to whack it
+gridEl.addEventListener('pointerdown', (e) => {
+  const cellDiv = e.target.closest('.cell');
+  if (!cellDiv) return;
+  if (S.state === 'idle' || S.state === 'over') return;
+  handleCell(+cellDiv.dataset.cell);
+});
+
+el.startBtn.addEventListener('click', startGame);
+el.againBtn.addEventListener('click', startGame);
+inputOptionEls.forEach(option => {
+  option.addEventListener('click', () => setInputMode(option.dataset.inputMode));
+});
+
+// =========================================================================
+// Boot
+// =========================================================================
+(async function boot() {
+  try {
+    const res = await fetch('/pieces/bach_wtc1_prelude1.json');
+    PIECE = await res.json();
+  } catch (err) {
+    el.startBtn.textContent = 'Failed to load piece';
+    console.error(err);
+    return;
+  }
+  Audio.loadPiano().then(() => {
+    el.startBtn.disabled = false;
+    el.startBtn.textContent = 'Start';
+  }).catch(() => {
+    el.startBtn.disabled = false;
+    el.startBtn.textContent = 'Start (no sound)';
+  });
+})();
+</script>
+</body>
+</html>
