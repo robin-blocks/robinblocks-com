@@ -218,6 +218,17 @@
   }
   .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--badge-dk); }
   .btn[disabled] { opacity: .6; cursor: default; }
+  .ios-hint {
+    margin: 14px auto 0; max-width: 360px; font-size: clamp(12px, 1.8vw, 14px);
+    line-height: 1.4; color: #ffe6b0; opacity: .9;
+    background: rgba(0,0,0,.28); border-radius: 10px; padding: 8px 12px;
+  }
+  .ios-hint.hidden { display: none; }
+  .ios-hint button {
+    background: none; border: none; color: inherit; cursor: pointer;
+    font: inherit; opacity: .7; padding: 0 2px; margin-left: 4px;
+  }
+  .ios-hint button:hover { opacity: 1; }
   .final-score { font-size: clamp(20px, 4vw, 36px); font-weight: 800; margin: 14px 0 0; }
   .final-score .v { color: #ffd166; }
   .new-high { color: #7CFFB2; font-weight: 800; margin-top: 6px; }
@@ -351,6 +362,8 @@
         <div class="kg" id="keys-grid"></div>
       </div>
       <button class="btn" id="start-btn" disabled>Loading piano…</button>
+      <p class="ios-hint hidden" id="ios-hint">🔇 No piano? Your iPhone's silent switch may mute it — flip it up.
+        <button type="button" id="ios-hint-x" aria-label="Dismiss">✕</button></p>
     </div>
 
     <div class="overlay hidden" id="over-overlay">
@@ -362,6 +375,10 @@
     </div>
   </div>
 </div>
+
+<!-- near-silent loop: played on the Start tap to flip the iOS audio session to
+     "Playback" so the piano isn't muted by the hardware silent switch -->
+<audio id="silent-loop" src="/silent.wav" loop preload="auto" playsinline style="display:none"></audio>
 
 <script>
 // =========================================================================
@@ -382,13 +399,41 @@ const CONFIG = {
   roundBonus: 40,
 };
 
+// iOS routes WebAudio to the ringer channel, so the hardware silent switch
+// mutes it. (iPadOS 13+ reports as "Macintosh", hence the touch-points check.)
+const IS_IOS = /iP(hone|od|ad)/.test(navigator.platform) ||
+  /iP(hone|od|ad)/.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+
 // =========================================================================
 // Audio: Salamander Grand Piano via smplr (same as the other games)
 // =========================================================================
 const Audio = {
   ctx: null, piano: null, loaded: false, loadingPromise: null,
-  init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
-  resume() { if (this.ctx && this.ctx.state === 'suspended') return this.ctx.resume(); },
+  silentEl: null,
+  init() {
+    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.silentEl = document.getElementById('silent-loop');
+    if (this.silentEl) this.silentEl.volume = 0.001;
+  },
+  resume() {
+    // iOS only: playing a near-silent looping <audio> inside the user gesture
+    // flips the page's audio session from "Ambient" (the ring/silent switch
+    // mutes it) to "Playback" (it doesn't) — and the WebAudio piano rendered
+    // alongside follows. A tiny empty buffer kicks the graph awake. This leaves
+    // the audio graph on ctx.destination, so if it fails the worst case is the
+    // old behaviour, never silence. (Same approach as Breakout Piano / Happy Bard.)
+    if (IS_IOS && this.ctx) {
+      if (this.silentEl && this.silentEl.paused) this.silentEl.play().catch(() => {});
+      try {
+        const buf = this.ctx.createBuffer(1, Math.max(1, (this.ctx.sampleRate * 0.05) | 0), this.ctx.sampleRate);
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf; src.connect(this.ctx.destination); src.start(0);
+      } catch (e) {}
+    }
+    if (this.ctx && this.ctx.state === 'suspended') return this.ctx.resume();
+  },
   loadPiano() {
     if (this.loadingPromise) return this.loadingPromise;
     this.init();
@@ -879,6 +924,17 @@ el.startBtn.addEventListener('click', startGame);
 el.againBtn.addEventListener('click', startGame);
 inputOptionEls.forEach(option => {
   option.addEventListener('click', () => setInputMode(option.dataset.inputMode));
+});
+
+// iOS silent-switch fallback hint (the audio reroute should make sound work,
+// but this covers cases where it doesn't). Dismissible, remembered per device.
+const iosHintEl = document.getElementById('ios-hint');
+if (IS_IOS && !localStorage.getItem('bachamole_ios_hint_dismissed')) {
+  iosHintEl.classList.remove('hidden');
+}
+document.getElementById('ios-hint-x').addEventListener('click', () => {
+  iosHintEl.classList.add('hidden');
+  try { localStorage.setItem('bachamole_ios_hint_dismissed', '1'); } catch (e) {}
 });
 
 // =========================================================================

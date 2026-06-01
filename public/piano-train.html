@@ -325,6 +325,15 @@
     transition: opacity .2s;
   }
   .overlay.hidden { display: none; }
+  .ios-hint {
+    margin: 14px auto 0; max-width: 340px; font-size: 13px; line-height: 1.4;
+    color: #cfe0ff; opacity: .9; background: rgba(0,0,0,.28);
+    border-radius: 10px; padding: 8px 12px;
+  }
+  .ios-hint.hidden { display: none; }
+  .ios-hint button { background: none; border: none; color: inherit; cursor: pointer;
+    font: inherit; opacity: .65; padding: 0 2px; margin-left: 4px; }
+  .ios-hint button:hover { opacity: 1; }
   .panel {
     background: rgba(18, 28, 50, 0.85);
     border: 1px solid var(--chrome-border);
@@ -559,6 +568,8 @@
       <div class="piece-picker-chips" id="piece-picker-chips"></div>
     </div>
     <button id="start-btn">Start playing</button>
+    <p class="ios-hint hidden" id="ios-hint">🔇 No sound? Your iPhone's silent switch may mute it — flip it up.
+      <button type="button" id="ios-hint-x" aria-label="Dismiss">✕</button></p>
   </div>
 </div>
 
@@ -582,6 +593,9 @@
 <audio class="ow-audio" src="/assets/ow3.wav" preload="auto"></audio>
 <audio class="whack-audio" src="/assets/whack1.mp3" preload="auto"></audio>
 <audio class="whack-audio" src="/assets/whack2.mp3" preload="auto"></audio>
+<!-- near-silent loop: played on Start to flip the iOS audio session to
+     "Playback" so the piano isn't muted by the hardware silent switch -->
+<audio id="silent-loop" src="/silent.wav" loop preload="auto" playsinline style="display:none"></audio>
 
 <script type="importmap">
 {
@@ -619,10 +633,14 @@ const SCORE = await fetch(`/pieces/${ACTIVE_PIECE_ID}.json`, { cache: "no-cache"
 
 
 // Convert beats to seconds. Shift the whole piece by COUNT_IN_BEATS so the
-// player gets a steady metronomic count-in (and four warmup coins) before the
-// music starts.
+// player gets a metronomic count-in (and that many warmup coins) before the
+// music starts. The count-in is exactly one bar of the piece's own metre,
+// expressed in quarter-note beats (our beat unit): 4/4→4, 2/4→2, 3/4→3,
+// 6/8→3, 12/8→6. Beat 0 of the count-in is accented so the downbeat is
+// audible and the metre is felt before the first note.
 const SEC_PER_BEAT = 60 / SCORE.metadata.tempo_bpm;
-const COUNT_IN_BEATS = 4;
+const [_TS_BEATS, _TS_BEAT_TYPE] = SCORE.metadata.time_signature || [4, 4];
+const COUNT_IN_BEATS = Math.max(1, Math.round(_TS_BEATS * (4 / _TS_BEAT_TYPE)));
 SCORE.rh_notes.forEach(n => { n.beat += COUNT_IN_BEATS; });
 SCORE.lh_notes.forEach(n => { n.beat += COUNT_IN_BEATS; });
 SCORE.rh_notes.forEach(n => { n.time = n.beat * SEC_PER_BEAT; n.duration = n.dur * SEC_PER_BEAT; });
@@ -656,17 +674,41 @@ const LANE_X = { 1: -2.4, 2: -1.2, 3: 0, 4: 1.2, 5: 2.4 }; // lane x positions
 // =========================================================================
 // Audio: Salamander Grand Piano via smplr (lazy-loaded from CDN).
 // =========================================================================
+// iOS routes WebAudio to the ringer channel, so the hardware silent switch
+// mutes it. (iPadOS 13+ reports as "Macintosh", hence the touch-points check.)
+const IS_IOS = /iP(hone|od|ad)/.test(navigator.platform) ||
+  /iP(hone|od|ad)/.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+
 const Audio = {
   ctx: null,
   piano: null,
   stoppers: new Map(),    // key -> stopper function returned by piano.start()
   loaded: false,
   loadingPromise: null,
+  silentEl: null,
   init() {
     if (this.ctx) return;
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.silentEl = document.getElementById('silent-loop');
+    if (this.silentEl) this.silentEl.volume = 0.001;
   },
+  // Where oscillator-based sounds (the metronome) connect.
+  out() { return this.ctx && this.ctx.destination; },
   resume() {
+    // iOS only: a near-silent looping <audio> flips the page's audio session to
+    // "Playback" so the hardware silent switch doesn't mute the WebAudio piano +
+    // metronome; a tiny empty buffer wakes the graph. Audio stays on
+    // ctx.destination, so worst case is the old behaviour, never silence. Must
+    // run in a user gesture. (Same approach as Breakout Piano / Happy Bard.)
+    if (IS_IOS && this.ctx) {
+      if (this.silentEl && this.silentEl.paused) this.silentEl.play().catch(() => {});
+      try {
+        const buf = this.ctx.createBuffer(1, Math.max(1, (this.ctx.sampleRate * 0.05) | 0), this.ctx.sampleRate);
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf; src.connect(this.ctx.destination); src.start(0);
+      } catch (e) {}
+    }
     if (this.ctx && this.ctx.state === 'suspended') return this.ctx.resume();
   },
   loadPiano() {
@@ -1608,7 +1650,9 @@ function checkCoinCollection() {
 
 function onCoinCollected(coinSpec) {
   updateCoinHud(true);
-  playMetronomeClick();
+  // Accent the count-in downbeat (beat 0) so the metre is heard before the
+  // first note. Off-beats and the music-section coins stay plain.
+  playMetronomeClick(coinSpec && coinSpec.beat === 0);
   spawnCoinSparkle(coinSpec);
   console.log(`[coin] beat ${coinSpec && coinSpec.beat} (total ${game.coins})`);
 }
@@ -1635,21 +1679,25 @@ function spawnCoinSparkle(coinSpec) {
 
 // Short percussive tick generated directly with Web Audio — distinct from the
 // piano samples so it reads as a metronome over the music.
-function playMetronomeClick() {
+function playMetronomeClick(accent = false) {
   if (!Audio.ctx) return;
   const ctx = Audio.ctx;
   const now = ctx.currentTime;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = 'square';
-  osc.frequency.value = 2200;
+  // Accented downbeat: higher pitch + louder + slightly longer so "one" is
+  // unmistakable against the plain off-beat ticks.
+  osc.frequency.value = accent ? 3300 : 2200;
+  const peak = accent ? 0.30 : 0.18;
+  const tail = accent ? 0.09 : 0.06;
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.003);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+  gain.gain.exponentialRampToValueAtTime(peak, now + 0.003);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + tail);
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(Audio.out());
   osc.start(now);
-  osc.stop(now + 0.08);
+  osc.stop(now + tail + 0.02);
 }
 
 function updateCoinHud(popped) {
@@ -1868,6 +1916,17 @@ function showToast(text) {
 
 // Buttons
 document.getElementById('start-btn').addEventListener('click', startGame);
+
+// iOS silent-switch fallback hint (the audio reroute should make sound work,
+// but this covers cases where it doesn't). Dismissible, remembered per device.
+const iosHintEl = document.getElementById('ios-hint');
+if (IS_IOS && !localStorage.getItem('pianotrain_ios_hint_dismissed')) {
+  iosHintEl.classList.remove('hidden');
+}
+document.getElementById('ios-hint-x').addEventListener('click', () => {
+  iosHintEl.classList.add('hidden');
+  try { localStorage.setItem('pianotrain_ios_hint_dismissed', '1'); } catch (e) {}
+});
 document.getElementById('replay-btn').addEventListener('click', startGame);
 
 // Keyboard
