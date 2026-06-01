@@ -164,6 +164,10 @@
   }
   #stage.show-keys .keycap { opacity: .9; }
   #stage.show-keys .cell.up .keycap { opacity: 0; transition: none; }
+  /* touch mode: the holes themselves are the targets — hide key labels and
+     give a clear tap affordance */
+  #stage.touch-mode .keycap { display: none; }
+  #stage.touch-mode .cell { cursor: pointer; }
   .cell.flash-wrong .hole .dirt-back { box-shadow: inset 0 0 0 4px #e0463c, inset 0 6px 10px rgba(0,0,0,.55); }
 
   /* confetti burst on the last mole of the bar */
@@ -190,6 +194,11 @@
     width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
     background: #fff; color: #2a3744; border-radius: 6px; font-weight: 800;
     font-family: inherit; box-shadow: 0 2px 0 rgba(0,0,0,.3); font-size: 15px;
+  }
+  /* tap-target dots shown in the legend for Touch mode */
+  .keys-legend kbd.dot {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 34%, #fff, #cdd8e2);
   }
   .input-picker {
     display: flex; align-items: center; gap: 5px; margin-top: 10px;
@@ -330,12 +339,13 @@
     <div class="overlay" id="start-overlay">
       <h1>Bach-a-Mole</h1>
       <p class="composer">J.S. Bach — The Well-Tempered Clavier, Prelude No.1 in C</p>
-      <p><b>Listen</b> as the moles pop up and play Bach's phrase — then <b>whack them back</b> in the same order.</p>
-      <p>Choose a keyboard layout below. Higher notes sit higher. Get it right and Bach plays on, a little faster each time.</p>
+      <p><b>Listen</b> as the moles pop up and play Bach's phrase — then <b>whack them back</b> in the same order, by key or by tap.</p>
+      <p>Pick how you'll play below. Higher notes sit higher. Get it right and Bach plays on, a little faster each time.</p>
       <p>You have three lives. Each wrong answer costs one.</p>
-      <div class="input-picker" role="group" aria-label="Keyboard layout">
-        <button class="input-option selected" type="button" data-input-mode="numpad" aria-pressed="true">Numpad</button>
+      <div class="input-picker" role="group" aria-label="Input method">
+        <button class="input-option" type="button" data-input-mode="numpad" aria-pressed="false">Numpad</button>
         <button class="input-option" type="button" data-input-mode="letters" aria-pressed="false">Letter keys</button>
+        <button class="input-option" type="button" data-input-mode="touch" aria-pressed="false">Touch</button>
       </div>
       <div class="keys-legend">
         <div class="kg" id="keys-grid"></div>
@@ -417,10 +427,14 @@ const INPUT_LAYOUTS = {
     ['A', 'KeyA'], ['S', 'KeyS'], ['D', 'KeyD'],
     ['Z', 'KeyZ'], ['X', 'KeyX'], ['C', 'KeyC'],
   ],
+  // Touch: no key codes — you tap the holes directly. Labels stay blank.
+  touch: Array.from({ length: 9 }, () => ['']),
 };
-let inputMode = 'numpad';
+const PREFERS_TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+let inputMode = PREFERS_TOUCH ? 'touch' : 'numpad';
 
 const gridEl = document.getElementById('grid');
+const stageEl = document.getElementById('stage');
 const cellEls = [];
 const MOLE_SPRITES = {
   neutral: '/assets/bach-mole.png',
@@ -446,9 +460,13 @@ const keysGridEl = document.getElementById('keys-grid');
 const inputOptionEls = [...document.querySelectorAll('.input-option')];
 function setInputMode(mode) {
   inputMode = mode;
+  const isTouch = mode === 'touch';
+  stageEl.classList.toggle('touch-mode', isTouch);
   const labels = INPUT_LAYOUTS[mode].map(([label]) => label);
   cellEls.forEach((cell, i) => { cell.querySelector('.keycap').textContent = labels[i]; });
-  keysGridEl.innerHTML = labels.map(label => `<kbd>${label}</kbd>`).join('');
+  keysGridEl.innerHTML = isTouch
+    ? Array.from({ length: 9 }, () => `<kbd class="dot"></kbd>`).join('')
+    : labels.map(label => `<kbd>${label}</kbd>`).join('');
   inputOptionEls.forEach(option => {
     const selected = option.dataset.inputMode === mode;
     option.classList.toggle('selected', selected);
@@ -840,13 +858,22 @@ window.addEventListener('keydown', (e) => {
   handleCell(cell);
 }, { passive: false });
 
-// pointer / touch support — tap a hole to whack it
+// pointer / touch support — tap a hole to whack it (works in every mode)
 gridEl.addEventListener('pointerdown', (e) => {
   const cellDiv = e.target.closest('.cell');
   if (!cellDiv) return;
+  e.preventDefault();   // suppress the synthetic click / text selection / scroll
   if (S.state === 'idle' || S.state === 'over') return;
-  handleCell(+cellDiv.dataset.cell);
-});
+  const cell = +cellDiv.dataset.cell;
+  if (S.state === 'call') {
+    // Mirror the keyboard path: buffer anticipation taps in the run-up to the
+    // player's turn so a tap a hair early still lands.
+    S.inputBuffer.push({ cell, time: performance.now() });
+    if (S.inputBuffer.length > 6) S.inputBuffer.shift();
+    return;
+  }
+  handleCell(cell);
+}, { passive: false });
 
 el.startBtn.addEventListener('click', startGame);
 el.againBtn.addEventListener('click', startGame);
